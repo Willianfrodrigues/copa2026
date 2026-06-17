@@ -264,6 +264,7 @@ tbody td{padding:11px 15px;font-size:13px;}
 <body>
 <div class="toast" id="toast"></div>
 
+<!-- inflr dashboard v2.6 - 2026-06-17 -->
 <!-- LOGIN -->
 <div id="login-screen">
   <div class="login-card">
@@ -974,18 +975,20 @@ function doLogout(){
   $('inp-u').value='';$('inp-p').value='';destroyCharts();
 }
 function startApp(){
-  $('login-screen').style.display='none';$('app').style.display='block';
-  if(USER.role==='admin'){
-    $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
-    loadCampConfigToForm();loadAdminUsers();loadAccessLog();
-  }else{
-    $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
-    $('ds').value=mStart();$('de').value=today();
-    // Carrega config do backend antes de renderizar
-    loadConfig().then(()=>{
-      renderCampHeader();
-      loadData();
-    });
+  try{
+    $('login-screen').style.display='none';$('app').style.display='block';
+    if(USER.role==='admin'){
+      $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
+      loadCampConfigToForm();loadAdminUsers();
+      setTimeout(()=>loadAccessLog(),500);
+    }else{
+      $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
+      $('ds').value=mStart();$('de').value=today();
+      loadConfig().then(()=>{ renderCampHeader(); loadData(); });
+    }
+  }catch(e){
+    console.error('startApp error:',e);
+    $('login-screen').style.display='flex';$('app').style.display='none';
   }
 }
 
