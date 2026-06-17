@@ -1043,7 +1043,7 @@ async function loadData(){
       apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
     // Carrega orgânico silenciosamente se ainda não foi carregado
-    if(!Object.keys(_orgData).length) await loadOrganico();
+    if(!Object.keys(_orgData).length) loadOrganico(); // não await — roda em background
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
