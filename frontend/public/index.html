@@ -69,7 +69,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .tab.active{background:var(--gold-light);color:var(--gold);border:1px solid var(--border2);}
 
 /* CAMPANHAS CONFIG HEADER */
-.camp-header{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;}
+.camp-header{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:24px;} /* colunas sobrescritas pelo JS */
 .camp-slot{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;position:relative;overflow:hidden;}
 .camp-slot::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--slot-color,var(--green));}
 .camp-slot-num{font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px;}
@@ -88,7 +88,7 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-h
 .kpi-sub{font-size:11px;color:var(--muted);}
 
 /* CAMP COMPARISON */
-.camp-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+.camp-compare{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;} /* colunas sobrescritas pelo JS */
 .cmp-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow);}
 .cmp-head{padding:14px 18px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
 .cmp-name{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;}
@@ -319,7 +319,7 @@ tbody td{padding:11px 15px;font-size:13px;}
 
       <!-- COMPARATIVO POR CAMPANHA -->
       <div id="tab-comparativo" style="display:none;">
-        <div class="sec-lbl">Comparativo das 3 Campanhas</div>
+        <div class="sec-lbl" id="lbl-comparativo">Comparativo das Campanhas</div>
         <div class="camp-compare" id="camp-compare"></div>
         <div class="sec-lbl" style="margin-top:24px;">Influenciadores por Campanha</div>
         <div id="influenciadores-section"></div>
@@ -516,15 +516,16 @@ async function apiFetch(path,opts={}){
 
 function renderCampHeader(){
   const cfg=getCampConfig();
-  // Só mostra campanhas que têm palavra-chave configurada
   const active=cfg.filter(c=>c.kw);
+  const el=$('camp-header');
   if(!active.length){
-    $('camp-header').innerHTML=`<div style="grid-column:1/-1;padding:12px;font-size:13px;color:var(--muted);">Nenhuma campanha configurada. Solicite ao administrador.</div>`;
+    el.setAttribute('style','display:block');
+    el.innerHTML=`<div style="padding:12px;font-size:13px;color:var(--muted);">Nenhuma campanha configurada. Solicite ao administrador.</div>`;
     return;
   }
-  // Monta só os slots ativos, mantendo a cor original do índice
-  $('camp-header').innerHTML=cfg.map((c,i)=>{
-    if(!c.kw) return ''; // omite não configuradas
+  el.setAttribute('style',`display:grid;grid-template-columns:repeat(${active.length},1fr);gap:14px;margin-bottom:24px;`);
+  el.innerHTML=cfg.map((c,i)=>{
+    if(!c.kw) return '';
     return `<div class="camp-slot" style="--slot-color:${CAMP_COLORS[i]}">
       <div class="camp-slot-num">Campanha ${i+1}</div>
       <div class="camp-slot-name">${c.nome||'—'}</div>
@@ -532,8 +533,6 @@ function renderCampHeader(){
       <div class="camp-slot-click">📊 ${CLICK_LABELS[c.click]||'Cliques no Link'}</div>
     </div>`;
   }).join('');
-  // Ajusta o grid dinamicamente
-  $('camp-header').style.gridTemplateColumns=`repeat(${active.length},1fr)`;
 }
 
 async function loadData(){
@@ -617,7 +616,10 @@ function renderComparativo(rows,kpi){
 
   const activeCount=cards.length;
   const compareEl=$('camp-compare');
-  compareEl.style.gridTemplateColumns=activeCount?`repeat(${activeCount},1fr)`:'1fr';
+  compareEl.setAttribute('style',`display:grid;grid-template-columns:repeat(${activeCount||1},1fr);gap:14px;`);
+  // Atualiza label dinamicamente
+  const lbl=$('lbl-comparativo');
+  if(lbl) lbl.textContent=`Comparativo das ${activeCount} Campanha${activeCount!==1?'s':''}`;
 
   if(!activeCount){
     compareEl.innerHTML=`<div class="cmp-card"><div class="cmp-body"><div class="empty" style="padding:24px;"><div class="ico">⚙️</div><p>Nenhuma campanha configurada. Solicite ao administrador.</p></div></div></div>`;
