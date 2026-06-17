@@ -105,15 +105,80 @@ def get_by_campaign(camp_filter, start, end):
 def get_by_influencer(camp_filter, start, end):
     q = f"""
     SELECT
-        -- Usa INFLUENCIADOR; se nulo, usa AD_NAME. Remove sufixos de mercado (- BR, - US, etc.)
-        TRIM(REGEXP_REPLACE(
-            COALESCE(
-                NULLIF(TRIM(INFLUENCIADOR), ''),
-                NULLIF(TRIM(AD_NAME), ''),
-                'Sem Influenciador'
-            ),
-            r'\s*-\s*(BR|US|PT|MX|AR|CL|CO)\s*(C\d+)?\s*$', ''
-        ))                                                         AS influenciador,
+        CASE
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'lucasguedez')                                          THEN 'lucasguedez'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'sofiasantino')                                         THEN 'sofiasantino'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'eunalumoura')                                          THEN 'eunalumoura'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'nellyhongval')                                         THEN 'nellyhongval'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'trizhermano')                                          THEN 'trizhermano'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'thamiresrangeel')                                     THEN 'thamiresrangeel'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'belezacomari')                                         THEN 'belezacomari'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'albaropaula')                                          THEN 'albaropaula'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'ciclopin')                                             THEN 'ciclopin'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'danmendesoficial')                                     THEN 'danmendesoficial'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'herdeiradabeleza')                                     THEN 'herdeiradabeleza'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'abcdapele')                                            THEN 'abcdapele'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'amandaapoxa')                                          THEN 'amandaapoxa'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'brunanaomisaito')                                      THEN 'brunanaomisaito'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'julianaluziee')                                        THEN 'julianaluziee'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'drursinhocarinhoso')                                   THEN 'drursinhocarinhoso'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'natymeirelesoficial')                                  THEN 'natymeirelesoficial'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'jardeledebran')                                        THEN 'jardeledebran'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'carolinnegas')                                         THEN 'carolinnegas'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'rufislore')                                            THEN 'rufislore'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'keirariff')                                            THEN 'keirariff'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'bomtalvao')                                            THEN 'bomtalvao'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'vitoria jansen|vitória jansen')                        THEN 'Vitória Jansen'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'julia stofel')                                         THEN 'Julia Stofel'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'gih gallotti')                                         THEN 'Gih Gallotti'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'vivie nkenda')                                         THEN 'Vivie Nkenda'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'beatriz macedo')                                       THEN 'Beatriz Macedo'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'vitor maciel')                                         THEN 'Vitor Maciel'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'weslley andrade')                                      THEN 'Weslley Andrade'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'mayara rodrigues')                                     THEN 'Mayara Rodrigues'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'sthefany vitoria|sthefany vitória|sthefany thais')    THEN 'Sthefany Vitória'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'celma barbosa')                                        THEN 'Celma Barbosa'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'katiane lima')                                         THEN 'Katiane Lima'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'gabe zanchi')                                          THEN 'Gabe Zanchi'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'antonella vanoni')                                     THEN 'Antonella Vanoni'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'gab lobo')                                             THEN 'Gab Lobo'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'giovanna fonseca')                                     THEN 'Giovanna Fonseca'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'dayellen')                                             THEN 'Dayellen'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'alan vivian')                                          THEN 'Alan Vivian'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'silvonei')                                             THEN 'Silvonei'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'bruno evangelista')                                    THEN 'Bruno Evangelista'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'rauany barcellos')                                     THEN 'Rauany Barcellos'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'karoline lima')                                        THEN 'Karoline Lima'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'dani cacella')                                         THEN 'Dani Cacella'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'dodo mendonça|dodo mendonca')                          THEN 'Dodo Mendonça'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'bil araujo')                                           THEN 'Bil Araujo'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'camila loures')                                        THEN 'Camila Loures'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'pati liberato')                                        THEN 'Pati Liberato'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'gabriel dantas')                                       THEN 'Gabriel Dantas'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'cath')                                                 THEN 'Cath'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'rebimboca')                                            THEN 'Rebimboca'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'hiane luiza')                                          THEN 'Hiane Luiza'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'drica divina')                                         THEN 'Drica Divina'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'lu borgatto')                                          THEN 'Lu Borgatto'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'carol priante')                                        THEN 'Carol Priante'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'gabriel braga')                                        THEN 'Gabriel Braga'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'wesley soares')                                        THEN 'Wesley Soares'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'canal bra')                                            THEN 'Canal Bra'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'hugo souza')                                           THEN 'Hugo Souza'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'bruna naomi')                                          THEN 'Bruna Naomi'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'lua lino')                                             THEN 'Lua Lino'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'nath carvalho')                                        THEN 'Nath Carvalho'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'giovana')                                              THEN 'Giovana'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'cesar')                                                THEN 'Cesar'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'jose luis')                                            THEN 'Jose Luis'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'norma')                                                THEN 'Norma'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'weena')                                                THEN 'Weena'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'coala')                                                THEN 'Coala'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'marina')                                               THEN 'Marina'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'angel')                                                THEN 'Angel'
+            WHEN REGEXP_CONTAINS(LOWER(AD_NAME), 'eve')                                                  THEN 'Eve'
+            ELSE NULL
+        END AS influenciador,
         platform,
         CAMPAIGN_NAME,
         SUM(COALESCE(IMPRESSIONS,   0))                            AS impressions,
@@ -144,6 +209,7 @@ def get_by_influencer(camp_filter, start, end):
     WHERE date BETWEEN '{start}' AND '{end}'
       AND {camp_filter}
     GROUP BY influenciador, platform, CAMPAIGN_NAME
+    HAVING influenciador IS NOT NULL
     ORDER BY impressions DESC
     """
     return bq_rows(q)
