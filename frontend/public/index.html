@@ -938,7 +938,23 @@ function showOrgSheet(id){
 
 // AUTH
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&$('login-screen').style.display!=='none')doLogin();});
-(function(){const t=sessionStorage.getItem('copa_token'),u=sessionStorage.getItem('copa_user');if(t&&u){TOKEN=t;USER=JSON.parse(u);startApp();}})();
+(function(){
+  const t=sessionStorage.getItem('copa_token'),u=sessionStorage.getItem('copa_user');
+  if(t&&u){
+    // Verifica se o token JWT ainda não expirou antes de restaurar a sessão
+    try{
+      const payload=JSON.parse(atob(t.split('.')[1]));
+      if(payload.exp && payload.exp * 1000 < Date.now()){
+        // Token expirado — limpa e mostra login
+        sessionStorage.removeItem('copa_token');sessionStorage.removeItem('copa_user');
+      } else {
+        TOKEN=t;USER=JSON.parse(u);startApp();
+      }
+    }catch(e){
+      sessionStorage.removeItem('copa_token');sessionStorage.removeItem('copa_user');
+    }
+  }
+})();
 
 async function doLogin(){
   const u=$('inp-u').value.trim(),p=$('inp-p').value;
@@ -961,14 +977,24 @@ function doLogout(){
   $('inp-u').value='';$('inp-p').value='';destroyCharts();
 }
 function startApp(){
-  $('login-screen').style.display='none';$('app').style.display='block';
-  if(USER.role==='admin'){
-    $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
-    loadCampConfigToForm();loadAdminUsers();
-  }else{
-    $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
-    $('ds').value=mStart();$('de').value=today();
-    loadConfig().then(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); }).catch(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); });
+  $('login-screen').style.display='none';
+  $('app').style.display='block';
+  const role = USER&&USER.role;
+  if(role==='admin'){
+    $('admin-panel').style.display='block';
+    $('dash-section').style.display='none';
+    $('topbar-dates').style.display='none';
+    loadCampConfigToForm();
+    loadAdminUsers();
+  } else {
+    $('admin-panel').style.display='none';
+    $('dash-section').style.display='block';
+    $('topbar-dates').style.display='flex';
+    $('ds').value=mStart();
+    $('de').value=today();
+    loadConfig()
+      .then(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); })
+      .catch(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); });
   }
 }
 
