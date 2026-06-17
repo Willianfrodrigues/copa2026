@@ -296,6 +296,7 @@ tbody td{padding:11px 15px;font-size:13px;}
       <div class="tabs">
         <button class="tab active" onclick="switchTab('overview',this)">Visão Geral</button>
         <button class="tab" onclick="switchTab('comparativo',this)">Por Campanha</button>
+        <button class="tab" onclick="switchTab('influenciadores',this)">Influenciadores</button>
         <button class="tab" onclick="switchTab('organico',this)">Dados Orgânicos</button>
       </div>
 
@@ -325,6 +326,51 @@ tbody td{padding:11px 15px;font-size:13px;}
         <div id="influenciadores-section"></div>
       </div>
 
+      <!-- INFLUENCIADORES -->
+      <div id="tab-influenciadores" style="display:none;">
+
+        <!-- Filtros -->
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div class="sec-lbl" style="margin:0 0 2px;">🏆 Ranking de Influenciadores</div>
+            <div style="font-size:12px;color:var(--muted);">Clique nas colunas para reordenar</div>
+          </div>
+          <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <input id="infl-search" placeholder="🔍 Buscar influenciador..." style="padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none;width:210px;" oninput="filterInflTable()">
+            <select id="infl-camp-filter" style="padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none;cursor:pointer;" onchange="filterInflTable()">
+              <option value="">Todas as campanhas</option>
+            </select>
+            <select id="infl-metric" style="padding:8px 13px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-family:'Inter',sans-serif;outline:none;cursor:pointer;" onchange="changeInflMetric(this.value)">
+              <option value="impressions">Ranking por Impressões</option>
+              <option value="clicks_link">Ranking por PG View</option>
+              <option value="vtr">Ranking por VTR</option>
+              <option value="thruplay">Ranking por ThruPlay</option>
+              <option value="views100">Ranking por Views 100%</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Pódio Top 3 -->
+        <div id="infl-podium" style="margin-bottom:24px;"></div>
+
+        <!-- KPI strip -->
+        <div id="infl-kpi-strip" style="display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px;"></div>
+
+        <!-- Tabela ranking -->
+        <div class="tbl-card">
+          <div class="tbl-top">
+            <div class="tbl-ttl">📋 Ranking Completo</div>
+            <span id="infl-count" style="font-size:12px;color:var(--muted);background:var(--bg2);padding:3px 10px;border-radius:20px;"></span>
+          </div>
+          <div style="overflow-x:auto;">
+            <table id="infl-table">
+              <thead><tr id="infl-thead"></tr></thead>
+              <tbody id="infl-tbody"></tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
       <!-- ORGÂNICO -->
       <div id="tab-organico" style="display:none;">
         <div class="organico-header">
@@ -346,7 +392,8 @@ tbody td{padding:11px 15px;font-size:13px;}
 
 <script>
 const API='';
-let USER=null,TOKEN=null,allCRows=[],CH={};
+let USER=null,TOKEN=null,allCRows=[],allInflRows=[],CH={};
+let _inflSortKey='impressions',_inflSortDir=-1;
 const $=id=>document.getElementById(id);
 const CAMP_COLORS=['#F5C842','#1EC99B','#3B82F6'];
 const CLICK_LABELS={clicks:'Cliques no Link',clicks_link:'PG View'};
@@ -570,14 +617,16 @@ async function loadData(){
   loading(true);if($('upd-btn'))$('upd-btn').disabled=true;
   try{
     const p=`start_date=${start}&end_date=${end}`;
-    const[kpi,series,byCamp]=await Promise.all([
+    const[kpi,series,byCamp,byInfl]=await Promise.all([
       apiFetch(`/api/data?${p}&type=kpi`),
       apiFetch(`/api/data?${p}&type=timeseries`),
       apiFetch(`/api/data?${p}&type=by_campaign`),
+      apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
+    if(byInfl){allInflRows=byInfl.rows||[];populateInflCampFilter();}
   }catch(e){console.error(e);toast('Erro ao buscar dados: '+e.message,'red');}
   finally{loading(false);if($('upd-btn'))$('upd-btn').disabled=false;}
 }
@@ -692,12 +741,179 @@ function renderComparativo(rows,kpi){
       </table></div></div>`;
   }).join('');
 }
+// INFLUENCIADORES
+const INFL_COLS = [
+  {key:'influenciador', label:'Influenciador',    fmt:r=>r.influenciador||'—',           sortable:true},
+  {key:'platform',      label:'Plataforma',       fmt:r=>{
+    const p=(r.platform||'').toLowerCase();
+    const pc=p.includes('tiktok')?'tiktok':p.includes('meta')||p.includes('facebook')?'meta':'other';
+    const pl=p.includes('tiktok')?'⬛ TikTok':p.includes('meta')||p.includes('facebook')?'🟦 Meta':r.platform||'—';
+    return `<span class="plt plt-${pc}">${pl}</span>`;
+  }, sortable:true},
+  {key:'impressions',   label:'Impressões',       fmt:(r,mx)=>`<div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${((r.impressions||0)/mx.imp*100).toFixed(1)}%;background:#F5C842;"></div></div><span class="bar-v">${fmt(r.impressions)}</span></div>`, sortable:true},
+  {key:'clicks_link',   label:'PG View',          fmt:r=>`<span style="font-weight:700;color:#1EC99B;">${fmt(r.clicks_link)}</span>`, sortable:true},
+  {key:'clicks',        label:'Clicks Link',      fmt:r=>fmt(r.clicks), sortable:true},
+  {key:'ctr_link',      label:'CTR PG View',      fmt:r=>`<span style="font-weight:700;color:#EC4899;">${fmtP(r.ctr_link)}</span>`, sortable:true},
+  {key:'ctr_click',     label:'CTR Clique',       fmt:r=>`<span style="color:#3B82F6;">${fmtP(r.ctr_click)}</span>`, sortable:true},
+  {key:'thruplay',      label:'ThruPlay',         fmt:r=>fmt(r.thruplay), sortable:true},
+  {key:'vtr',           label:'VTR',              fmt:(r,mx)=>{
+    const vtrColor=(r.vtr||0)>=15?'#1EC99B':(r.vtr||0)>=8?'#F5C842':'#F05A5A';
+    const pct=Math.min(((r.vtr||0)/(mx.vtr||1)*100),100).toFixed(1);
+    return `<div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${pct}%;background:${vtrColor};"></div></div><span class="bar-v" style="color:${vtrColor};font-weight:700;">${fmtP(r.vtr)}</span></div>`;
+  }, sortable:true},
+  {key:'views100',      label:'Views 100%',       fmt:r=>fmt(r.views100), sortable:true},
+  {key:'comments',      label:'💬 Coment.',       fmt:r=>fmt(r.comments), sortable:true},
+  {key:'reactions',     label:'❤️ Reações',       fmt:r=>fmt(r.reactions), sortable:true},
+  {key:'saves',         label:'🔖 Salvamentos',   fmt:r=>fmt(r.saves), sortable:true},
+  {key:'shares',        label:'↗️ Compartilh.',   fmt:r=>fmt(r.shares), sortable:true},
+];
+
+function populateInflCampFilter(){
+  const sel=$('infl-camp-filter');
+  const camps=[...new Set(allInflRows.map(r=>r.CAMPAIGN_NAME||'').filter(Boolean))].sort();
+  sel.innerHTML=`<option value="">Todas as campanhas</option>`+camps.map(c=>`<option value="${c}">${c}</option>`).join('');
+}
+
+function getFilteredInflRows(){
+  const search=($('infl-search')?.value||'').toLowerCase();
+  const camp=$('infl-camp-filter')?.value||'';
+  return allInflRows.filter(r=>{
+    const matchSearch=!search||(r.influenciador||'').toLowerCase().includes(search);
+    const matchCamp=!camp||(r.CAMPAIGN_NAME||'')==camp;
+    return matchSearch&&matchCamp;
+  });
+}
+
+function changeInflMetric(key){
+  _inflSortKey=key; _inflSortDir=-1;
+  renderInflTable();
+}
+
+function sortInfl(key){
+  if(_inflSortKey===key)_inflSortDir*=-1;
+  else{_inflSortKey=key;_inflSortDir=-1;}
+  renderInflTable();
+}
+
+function filterInflTable(){renderInflTable();}
+
+function renderInflPodium(sorted){
+  const podiumEl=$('infl-podium');
+  if(!sorted.length){podiumEl.innerHTML='';return;}
+
+  // Agrupa por influenciador (soma todas as linhas do mesmo influenciador)
+  const byInfl={};
+  sorted.forEach(r=>{
+    const k=r.influenciador||'Sem Influenciador';
+    if(!byInfl[k])byInfl[k]={influenciador:k,impressions:0,clicks_link:0,thruplay:0,vtr_sum:0,vtr_count:0,views100:0};
+    byInfl[k].impressions+=r.impressions||0;
+    byInfl[k].clicks_link+=r.clicks_link||0;
+    byInfl[k].thruplay+=r.thruplay||0;
+    byInfl[k].vtr_sum+=r.vtr||0;
+    byInfl[k].vtr_count+=1;
+    byInfl[k].views100+=r.views100||0;
+  });
+  Object.values(byInfl).forEach(r=>r.vtr=r.vtr_count?r.vtr_sum/r.vtr_count:0);
+
+  const rankList=Object.values(byInfl).sort((a,b)=>(b[_inflSortKey]||0)-(a[_inflSortKey]||0));
+  const top=rankList.slice(0,3);
+  if(!top.length){podiumEl.innerHTML='';return;}
+
+  const metricLabels={impressions:'Impressões',clicks_link:'PG View',vtr:'VTR',thruplay:'ThruPlay',views100:'Views 100%'};
+  const metricFmt={impressions:v=>fmt(v),clicks_link:v=>fmt(v),vtr:v=>fmtP(v),thruplay:v=>fmt(v),views100:v=>fmt(v)};
+  const mLabel=metricLabels[_inflSortKey]||'Impressões';
+  const mFmt=metricFmt[_inflSortKey]||fmt;
+
+  const medals=['🥇','🥈','🥉'];
+  const heights=['140px','110px','90px'];
+  const podiumOrder=top.length>=2?[top[1],top[0],top[2]||null]:[top[0]];
+  const podiumIdx=top.length>=2?[1,0,2]:[0];
+  const colors=['#C0C0C0','#F5C842','#CD7F32'];
+
+  podiumEl.innerHTML=`<div style="display:flex;align-items:flex-end;justify-content:center;gap:12px;padding:0 20px 0;">
+    ${podiumOrder.map((r,i)=>{
+      if(!r)return'';
+      const origIdx=podiumIdx[i];
+      const col=colors[origIdx];
+      const h=heights[origIdx];
+      const medal=medals[origIdx];
+      return`<div style="flex:1;max-width:300px;display:flex;flex-direction:column;align-items:center;gap:0;">
+        <div style="text-align:center;margin-bottom:8px;">
+          <div style="font-size:28px;margin-bottom:4px;">${medal}</div>
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:#fff;max-width:180px;word-break:break-word;line-height:1.2;">${r.influenciador}</div>
+          <div style="font-size:20px;font-weight:800;color:${col};margin-top:6px;font-family:'Space Grotesk',sans-serif;">${mFmt(r[_inflSortKey]||0)}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${mLabel}</div>
+        </div>
+        <div style="width:100%;height:${h};background:linear-gradient(180deg,${col}33 0%,${col}11 100%);border:1px solid ${col}55;border-bottom:none;border-radius:8px 8px 0 0;display:flex;align-items:flex-end;justify-content:center;padding-bottom:12px;">
+          <div style="text-align:center;">
+            <div style="font-size:11px;color:var(--muted);">Impressões</div>
+            <div style="font-size:13px;font-weight:600;color:${col};">${fmt(r.impressions)}</div>
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+
+function renderInflTable(){
+  const rows=getFilteredInflRows();
+  rows.sort((a,b)=>{
+    const av=a[_inflSortKey]??0, bv=b[_inflSortKey]??0;
+    if(typeof av==='string')return av.localeCompare(bv)*_inflSortDir;
+    return(av-bv)*_inflSortDir;
+  });
+
+  // Pódio
+  renderInflPodium(rows);
+
+  // KPI strip
+  const totImp=rows.reduce((s,r)=>s+(r.impressions||0),0);
+  const totClkL=rows.reduce((s,r)=>s+(r.clicks_link||0),0);
+  const totTP=rows.reduce((s,r)=>s+(r.thruplay||0),0);
+  const totV100=rows.reduce((s,r)=>s+(r.views100||0),0);
+  const avgVtr=rows.length?rows.reduce((s,r)=>s+(r.vtr||0),0)/rows.length:0;
+  const uniqueInfl=new Set(rows.map(r=>r.influenciador)).size;
+  $('infl-kpi-strip').innerHTML=[
+    {l:'Influenciadores',v:uniqueInfl,      ac:'#F5C842'},
+    {l:'Impressões',     v:fmt(totImp),     ac:'#1EC99B'},
+    {l:'PG View',        v:fmt(totClkL),    ac:'#EC4899'},
+    {l:'ThruPlay',       v:fmt(totTP),      ac:'#F5A623'},
+    {l:'VTR Médio',      v:fmtP(avgVtr),    ac:'#8B5CF6'},
+  ].map(c=>`<div class="kpi-card" style="--ac:${c.ac};padding:14px 16px;"><div class="kpi-lbl">${c.l}</div><div class="kpi-val" style="font-size:22px;">${c.v}</div></div>`).join('');
+
+  $('infl-count').textContent=`${rows.length} linha${rows.length!==1?'s':''}`;
+
+  if(!rows.length){
+    $('infl-tbody').innerHTML=`<tr><td colspan="${INFL_COLS.length+1}"><div class="empty"><div class="ico">👤</div><h3>Nenhum dado encontrado</h3></div></td></tr>`;
+    return;
+  }
+
+  const maxV={imp:Math.max(...rows.map(r=>r.impressions||0),1), vtr:Math.max(...rows.map(r=>r.vtr||0),1)};
+
+  // Build header with sort indicators
+  $('infl-thead').innerHTML=`<th>#</th>`+INFL_COLS.map(c=>{
+    const active=_inflSortKey===c.key;
+    const arrow=active?(_inflSortDir===-1?' ▼':' ▲'):'';
+    const style=`cursor:pointer;${active?'color:var(--gold);background:var(--gold-light);':''}`;
+    return `<th style="${style}" onclick="sortInfl('${c.key}')">${c.label}${arrow}</th>`;
+  }).join('');
+
+  // Rank number per influncr
+  $('infl-tbody').innerHTML=rows.map((r,i)=>{
+    const medal=i===0?'🥇':i===1?'🥈':i===2?'🥉':`<span style="color:var(--muted);font-size:12px;">${i+1}</span>`;
+    const cells=INFL_COLS.map(c=>{ try{return`<td>${c.fmt(r,maxV)}</td>`;}catch(e){return`<td>${r[c.key]??'—'}</td>`;} }).join('');
+    const highlight=i<3?`background:rgba(245,200,66,${0.04-i*0.01});`:'';
+    return`<tr style="${highlight}"><td style="text-align:center;">${medal}</td>${cells}</tr>`;
+  }).join('');
+}
+
 
 function switchTab(name,el){
   document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
-  ['overview','comparativo','organico'].forEach(t=>$('tab-'+t).style.display=t===name?'block':'none');
+  ['overview','comparativo','influenciadores','organico'].forEach(t=>$('tab-'+t).style.display=t===name?'block':'none');
   if(name==='organico')loadOrganico();
+  if(name==='influenciadores')renderInflTable();
 }
 
 // ADMIN USERS
