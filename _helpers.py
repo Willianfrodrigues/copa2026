@@ -92,14 +92,13 @@ def get_bq():
     return bigquery.Client(project=BQ_PROJECT)
 
 def build_campaign_filter(user: dict) -> str:
-    """Monta o WHERE baseado nas palavras-chave do cliente (usando parâmetros seguros)."""
+    """Filtra por palavras-chave do usuário. Vazio = vê tudo. Admin = vê tudo."""
     if user["role"] == "admin":
         return "1=1"
-    keywords = user.get("campaigns", [])
+    keywords = [k.strip().upper() for k in user.get("campaigns", []) if k.strip()]
     if not keywords:
-        return "1=1"  # lista vazia = acesso total (conforme UI: "deixe em branco para ver todas")
-    # Escape single quotes and percent signs to avoid SQL injection
-    safe_kws = [kw.upper().replace("'", "''").replace("\\", "\\\\") for kw in keywords]
+        return "1=1"  # vazio = acesso a todas as campanhas
+    safe_kws = [kw.replace("'", "''").replace("\\", "\\\\") for kw in keywords]
     conditions = " OR ".join(
         [f"UPPER(CAMPAIGN_NAME) LIKE '%{kw}%'" for kw in safe_kws]
     )
