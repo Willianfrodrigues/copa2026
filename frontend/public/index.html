@@ -692,24 +692,96 @@ function parseOrgNum(v){
   return parseFloat(v.replace(/\./g,'').replace(',','.').replace(/[^\d.]/g,''))||0;
 }
 
+function getSheetTotals(rows){
+  // Returns {imp, view} — tries multiple strategies
+  if(!rows) return {imp:0,view:0};
+  const headers=rows[0];
+  const data=rows.slice(1).filter(r=>r.some(c=>c));
+
+  // Strategy 1: look for a header cell with "TOTAL IMPRESS" anywhere (like col F)
+  const idxTotImp  = headers.findIndex(h=>/total.+impress|impress.+total/i.test(h));
+  const idxTotView = headers.findIndex(h=>/total.+view|view.+total/i.test(h));
+  if(idxTotImp>=0){
+    // value is usually in row 1 (first data row) of that column
+    const val = data.find(r=>r[idxTotImp]&&r[idxTotImp]!=='-');
+    if(val) return {
+      imp:  parseOrgNum(val[idxTotImp]||'0'),
+      view: idxTotView>=0 ? parseOrgNum(val[idxTotView]||'0') : 0
+    };
+  }
+
+  // Strategy 2: find TOTAL row in Influenciador column
+  const idxInfl= headers.findIndex(h=>/influenc/i.test(h));
+  const idxImp = headers.findIndex(h=>/^impress/i.test(h));
+  const idxView= headers.findIndex(h=>/^view/i.test(h));
+  const totalRow= data.find(r=>/total/i.test(r[Math.max(idxInfl,0)]||''));
+  if(totalRow) return {
+    imp:  idxImp>=0  ? parseOrgNum(totalRow[idxImp]||'0')  : 0,
+    view: idxView>=0 ? parseOrgNum(totalRow[idxView]||'0') : 0
+  };
+
+  // Strategy 3: sum all non-total rows
+  const inflRows=data.filter(r=>r[Math.max(idxInfl,0)]&&!/total/i.test(r[Math.max(idxInfl,0)]||''));
+  return {
+    imp:  idxImp>=0  ? inflRows.reduce((s,r)=>s+parseOrgNum(r[idxImp]||''),0)  : 0,
+    view: idxView>=0 ? inflRows.reduce((s,r)=>s+parseOrgNum(r[idxView]||''),0) : 0
+  };
+}
+
 function renderOrgCards(){
-  $('org-cards').innerHTML=ORG_SHEETS.map(s=>{
+  // Grand totals across all sheets
+  let grandImp=0, grandView=0;
+  ORG_SHEETS.forEach(s=>{
+    const t=getSheetTotals(_orgData[s.id]);
+    grandImp+=t.imp; grandView+=t.view;
+  });
+
+  // Grand total banner
+  const banner = grandImp>0 ? `
+    <div style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,200,66,.15),rgba(245,200,66,.05));border:1px solid var(--border2);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
+      <div style="display:flex;align-items:center;gap:10px;">
+        <span style="font-size:24px;">📊</span>
+        <div>
+          <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Total Geral — Todas as Campanhas Orgânicas</div>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Soma de todas as abas configuradas</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:24px;flex-wrap:wrap;">
+        <div style="text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;color:var(--gold);">${fmtOrgNum(String(grandImp))}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Impressões</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;color:var(--green);">${fmtOrgNum(String(grandView))}</div>
+          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Views</div>
+        </div>
+      </div>
+    </div>` : '';
+
+  const cards = ORG_SHEETS.map(s=>{
     const rows=_orgData[s.id];
     if(!rows) return `<div class="kpi-card" style="--ac:${s.color};opacity:.35;"><div class="kpi-lbl">${s.icon} ${s.label}</div><div class="kpi-val nd">Não configurada</div></div>`;
+
     const headers=rows[0];
     const data=rows.slice(1).filter(r=>r.some(c=>c));
     const idxInfl=headers.findIndex(h=>/influenc/i.test(h));
     const idxImp =headers.findIndex(h=>/impress/i.test(h));
-    const idxView=headers.findIndex(h=>/view/i.test(h));
-    const totalRow=data.find(r=>/total/i.test(r[Math.max(idxInfl,0)]||''));
-    const totImp =totalRow&&idxImp>=0  ? fmtOrgNum(totalRow[idxImp])  : '—';
-    const totView=totalRow&&idxView>=0 ? fmtOrgNum(totalRow[idxView]) : '—';
+
+    const {imp:totImpN, view:totViewN}=getSheetTotals(rows);
+    const totImp  = totImpN  ? fmtOrgNum(String(totImpN))  : '—';
+    const totView = totViewN ? fmtOrgNum(String(totViewN)) : '—';
+
     const inflRows=data.filter(r=>r[Math.max(idxInfl,0)]&&!/total/i.test(r[Math.max(idxInfl,0)]||''));
     const pendentes=inflRows.filter(r=>{const v=r[idxImp>=0?idxImp:2]||'';return v==='-'||v===''||v.toLowerCase()==='pendente';}).length;
+
+    // % of grand total
+    const pct = grandImp>0 ? ((totImpN/grandImp)*100).toFixed(1) : 0;
+
     return `<div class="kpi-card" style="--ac:${s.color};cursor:pointer;transition:transform .2s,box-shadow .2s;" onclick="showOrgSheet('${s.id}')" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
       <div class="kpi-lbl">${s.icon} ${s.label}</div>
-      <div class="kpi-val" style="font-size:20px;margin-bottom:2px;">${totImp}</div>
-      <div class="kpi-sub">impressões totais</div>
+      <div class="kpi-val" style="font-size:22px;margin-bottom:2px;">${totImp}</div>
+      <div class="kpi-sub">impressões</div>
+      ${grandImp>0?`<div style="margin-top:6px;"><div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${s.color};border-radius:2px;transition:width .8s;"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px;">${pct}% do total</div></div>`:''}
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:4px;">
         <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👁 Views</span><strong>${totView}</strong></div>
         <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👤 Influenciadores</span><strong>${inflRows.length}</strong></div>
@@ -717,6 +789,8 @@ function renderOrgCards(){
       </div>
     </div>`;
   }).join('');
+
+  $('org-cards').innerHTML = banner + cards;
 }
 
 function renderOrgPodium(){
