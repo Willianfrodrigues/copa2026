@@ -141,6 +141,7 @@ def get_by_influencer(camp_filter, start, end):
     return bq_rows(q)
 
 
+class handler(BaseHTTPRequestHandler):
 
     def do_OPTIONS(self):
         self.send_response(200)
