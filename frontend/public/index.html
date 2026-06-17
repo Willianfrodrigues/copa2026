@@ -959,12 +959,15 @@ async function loadData(){
   loading(true);if($('upd-btn'))$('upd-btn').disabled=true;
   try{
     const p=`start_date=${start}&end_date=${end}`;
+    // Carrega BQ + orgânico em paralelo para ter totais disponíveis no KPI
     const[kpi,series,byCamp,byInfl]=await Promise.all([
       apiFetch(`/api/data?${p}&type=kpi`),
       apiFetch(`/api/data?${p}&type=timeseries`),
       apiFetch(`/api/data?${p}&type=by_campaign`),
       apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
+    // Carrega orgânico silenciosamente se ainda não foi carregado
+    if(!Object.keys(_orgData).length) await loadOrganico();
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
@@ -975,18 +978,27 @@ async function loadData(){
 
 function renderKPIs(k){
   const cfg=getCampConfig();
-  // Detectar qual tipo de clique usar (pega o do primeiro configurado)
   const clickKey=cfg.find(c=>c.kw)?.click||'clicks';
   const clickLabel=CLICK_LABELS[clickKey]||'Cliques';
-  const cards=[
-    {l:'Impressões',v:fmt(k.impressions),s:'total',ac:'#F5C842'},
-    {l:clickLabel,v:fmt(k[clickKey]),s:'tipo configurado',ac:'#1EC99B'},
-    {l:'CTR',v:fmtP(k.ctr),s:'taxa de cliques',ac:'#EC4899'},
-    {l:'ThruPlay',v:fmt(k.thruplay),s:'vídeos completos',ac:'#F5A623'},
-    {l:'VTR',v:fmtP(k.vtr),s:'view through rate',ac:'#8B5CF6'},
-    {l:'Views 100%',v:fmt(k.views100),s:'assistidos até fim',ac:'#06B6D4'},
-  ];
-  $('kpi-grid').innerHTML=cards.map(c=>`<div class="kpi-card" style="--ac:${c.ac}"><div class="kpi-lbl">${c.l}</div><div class="kpi-val ${c.v==='—'?'nd':''}">${c.v}</div><div class="kpi-sub">${c.s}</div></div>`).join('');
+
+  // Soma impressões orgânicas
+  let orgImp=0;
+  if(typeof _orgData !== 'undefined'){
+    ORG_SHEETS.forEach(s=>{ orgImp+=getSheetTotals(_orgData[s.id]).imp; });
+  }
+  const totalImp = (Number(k.impressions)||0) + orgImp;
+
+  const impCard = `<div class="kpi-card" style="--ac:#F5C842"><div class="kpi-lbl">Impressões</div><div class="kpi-val">${fmt(totalImp)}</div><div class="kpi-sub">${orgImp>0?'paid + orgânico':'total'}</div></div>`;
+
+  const otherCards=[
+    {l:clickLabel,  v:fmt(k[clickKey]),  s:'tipo configurado', ac:'#1EC99B'},
+    {l:'CTR',       v:fmtP(k.ctr),       s:'taxa de cliques',  ac:'#EC4899'},
+    {l:'ThruPlay',  v:fmt(k.thruplay),   s:'vídeos completos', ac:'#F5A623'},
+    {l:'VTR',       v:fmtP(k.vtr),       s:'view through rate',ac:'#8B5CF6'},
+    {l:'Views 100%',v:fmt(k.views100),   s:'assistidos até fim',ac:'#06B6D4'},
+  ].map(c=>`<div class="kpi-card" style="--ac:${c.ac}"><div class="kpi-lbl">${c.l}</div><div class="kpi-val ${c.v==='—'?'nd':''}">${c.v}</div><div class="kpi-sub">${c.s}</div></div>`).join('');
+
+  $('kpi-grid').innerHTML = impCard + otherCards;
 }
 
 function destroyCharts(){Object.values(CH).forEach(c=>c&&c.destroy());CH={};}
