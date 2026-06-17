@@ -693,34 +693,52 @@ function parseOrgNum(v){
 }
 
 function getSheetTotals(rows){
-  // Returns {imp, view} — tries multiple strategies
   if(!rows) return {imp:0,view:0};
   const headers=rows[0];
   const data=rows.slice(1).filter(r=>r.some(c=>c));
 
-  // Strategy 1: look for a header cell with "TOTAL IMPRESS" anywhere (like col F)
+  // Strategy 1: find a cell with "total geral" or "total" anywhere in any row/col of headers
+  // Pattern: cell with "total geral" → next cell = impressões, cell after = views
+  for(let ri=0; ri<Math.min(rows.length,5); ri++){
+    const row=rows[ri];
+    for(let ci=0; ci<row.length; ci++){
+      if(/total\s*geral/i.test(row[ci]||'')){
+        const imp  = parseOrgNum(row[ci+1]||'0');
+        const view = parseOrgNum(row[ci+2]||'0');
+        if(imp>0) return {imp, view};
+      }
+    }
+  }
+
+  // Strategy 2: header cell "TOTAL IMPRESSÕES" or "TOTAL VIEWS" (Dados Gerais col F/G)
   const idxTotImp  = headers.findIndex(h=>/total.+impress|impress.+total/i.test(h));
   const idxTotView = headers.findIndex(h=>/total.+view|view.+total/i.test(h));
   if(idxTotImp>=0){
-    // value is usually in row 1 (first data row) of that column
-    const val = data.find(r=>r[idxTotImp]&&r[idxTotImp]!=='-');
+    const val=data.find(r=>r[idxTotImp]&&r[idxTotImp]!=='-'&&r[idxTotImp].trim()!=='');
     if(val) return {
       imp:  parseOrgNum(val[idxTotImp]||'0'),
       view: idxTotView>=0 ? parseOrgNum(val[idxTotView]||'0') : 0
     };
   }
 
-  // Strategy 2: find TOTAL row in Influenciador column
+  // Strategy 3: TOTAL row in Influenciador column
   const idxInfl= headers.findIndex(h=>/influenc/i.test(h));
   const idxImp = headers.findIndex(h=>/^impress/i.test(h));
   const idxView= headers.findIndex(h=>/^view/i.test(h));
-  const totalRow= data.find(r=>/total/i.test(r[Math.max(idxInfl,0)]||''));
+  const totalRow=data.find(r=>/^total$/i.test((r[Math.max(idxInfl,0)]||'').trim()));
   if(totalRow) return {
     imp:  idxImp>=0  ? parseOrgNum(totalRow[idxImp]||'0')  : 0,
     view: idxView>=0 ? parseOrgNum(totalRow[idxView]||'0') : 0
   };
 
-  // Strategy 3: sum all non-total rows
+  // Strategy 4: any row containing "total" in first column
+  const anyTotal=data.find(r=>/total/i.test((r[0]||'').trim()));
+  if(anyTotal && idxImp>=0) return {
+    imp:  parseOrgNum(anyTotal[idxImp]||'0'),
+    view: idxView>=0 ? parseOrgNum(anyTotal[idxView]||'0') : 0
+  };
+
+  // Strategy 5: sum all non-header, non-total rows
   const inflRows=data.filter(r=>r[Math.max(idxInfl,0)]&&!/total/i.test(r[Math.max(idxInfl,0)]||''));
   return {
     imp:  idxImp>=0  ? inflRows.reduce((s,r)=>s+parseOrgNum(r[idxImp]||''),0)  : 0,
