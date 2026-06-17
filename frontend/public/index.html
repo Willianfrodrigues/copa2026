@@ -651,7 +651,7 @@ async function saveAndTestSheets(){
   else toast(res?.error||'Erro ao salvar.','red');
 }
 
-async function loadOrganico(){
+async function loadOrganico(silent=false){
   const data=await loadConfig();
   const urls=data?.sheets_urls||{};
   if(!urls.geral&&data?.sheets_url) urls.geral=data.sheets_url;
@@ -666,7 +666,7 @@ async function loadOrganico(){
     return;
   }
 
-  loading(true,'Importando planilhas...');
+  if(!silent) loading(true,'Importando planilhas...');
   try{
     const results=await Promise.all(ORG_SHEETS.map(s=>fetchCSV(urls[s.id])));
     _orgData={};
@@ -674,9 +674,8 @@ async function loadOrganico(){
     renderOrgCards();
     renderOrgPodium();
     renderOrgSubTabs();
-    // Abre vista unificada por padrão
     showOrgSheet('all');
-  }finally{loading(false);}
+  }finally{if(!silent) loading(false);}
 }
 
 function fmtOrgNum(v){
@@ -1042,8 +1041,8 @@ async function loadData(){
       apiFetch(`/api/data?${p}&type=by_campaign`),
       apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
-    // Carrega orgânico silenciosamente se ainda não foi carregado
-    if(!Object.keys(_orgData).length) loadOrganico(); // não await — roda em background
+    // Carrega orgânico em background sem bloquear a tela
+    if(!Object.keys(_orgData).length) loadOrganico(true);
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
