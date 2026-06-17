@@ -979,8 +979,7 @@ function doLogout(){
 function startApp(){
   $('login-screen').style.display='none';
   $('app').style.display='block';
-  const role = USER&&USER.role;
-  if(role==='admin'){
+  if(USER && USER.role==='admin'){
     $('admin-panel').style.display='block';
     $('dash-section').style.display='none';
     $('topbar-dates').style.display='none';
@@ -992,23 +991,18 @@ function startApp(){
     $('topbar-dates').style.display='flex';
     $('ds').value=mStart();
     $('de').value=today();
-    // Renderiza imediatamente com cache vazio, depois atualiza
     renderCampHeader();
     loadData();
-    // Busca config em background para atualizar header
-    loadConfig().then(()=>{ renderCampHeader(); }).catch(()=>{});
   }
 }
+
 
 async function apiFetch(path,opts={}){
   try{
     const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
     if(res.status===401){doLogout();return null;}
     return res.json();
-  }catch(e){
-    console.error('apiFetch error:',path,e);
-    return null;
-  }
+  }catch(e){console.error('apiFetch',path,e);return null;}
 }
 
 function renderCampHeader(){
@@ -1044,7 +1038,6 @@ async function loadData(){
       apiFetch(`/api/data?${p}&type=by_campaign`),
       apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
-    // Carrega orgânico silenciosamente se ainda não foi carregado
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
