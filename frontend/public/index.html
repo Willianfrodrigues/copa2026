@@ -1000,9 +1000,16 @@ function startApp(){
 async function apiFetch(path,opts={}){
   try{
     const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
-    if(res.status===401){doLogout();return null;}
+    if(res.status===401){
+      toast('Sessão expirada. Fazendo logout...','red');
+      setTimeout(doLogout, 2000);
+      return null;
+    }
     return res.json();
-  }catch(e){console.error('apiFetch',path,e);return null;}
+  }catch(e){
+    console.error('apiFetch error:',path,e.message);
+    return null;
+  }
 }
 
 function renderCampHeader(){
