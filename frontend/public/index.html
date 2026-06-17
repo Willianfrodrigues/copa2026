@@ -358,55 +358,113 @@ function mStart(){const d=new Date();d.setDate(1);return d.toISOString().split('
 function loading(show,txt='Buscando dados...'){$('lov').style.display=show?'flex':'none';$('ltxt').textContent=txt;}
 function toast(msg,type='green'){const t=$('toast');t.textContent=msg;t.className=`toast ${type} show`;setTimeout(()=>t.className='toast',3200);}
 
-// CONFIG CAMPANHAS
+// CONFIG CAMPANHAS — armazenada no backend, cache local apenas para performance
+let _campConfigCache = null;
+
 function getCampConfig(){
-  const saved=localStorage.getItem('copa_camps');
-  if(saved)return JSON.parse(saved);
+  // Retorna o cache se disponível, senão default vazio (será preenchido por loadConfig)
+  if(_campConfigCache) return _campConfigCache;
   return [
     {nome:'Campanha 1',kw:'',click:'clicks'},
     {nome:'Campanha 2',kw:'',click:'clicks'},
     {nome:'Campanha 3',kw:'',click:'clicks'},
   ];
 }
-function saveCampConfig(){
+
+async function loadConfig(){
+  // Busca config do backend (funciona para admin e cliente)
+  try{
+    const data = await apiFetch('/api/config');
+    if(data && data.camps){
+      _campConfigCache = data.camps;
+    }
+    return data;
+  }catch(e){
+    console.warn('Erro ao carregar config:',e);
+    return null;
+  }
+}
+
+async function saveCampConfig(){
   const cfg=[
     {nome:$('c1-nome').value.trim(),kw:$('c1-kw').value.trim().toUpperCase(),click:$('c1-click').value},
     {nome:$('c2-nome').value.trim(),kw:$('c2-kw').value.trim().toUpperCase(),click:$('c2-click').value},
     {nome:$('c3-nome').value.trim(),kw:$('c3-kw').value.trim().toUpperCase(),click:$('c3-click').value},
   ];
-  localStorage.setItem('copa_camps',JSON.stringify(cfg));
-  toast('Configuração salva!');
+  const sheetsUrl = $('sheets-url').value.trim();
+  const res = await apiFetch('/api/config',{method:'POST',body:JSON.stringify({camps:cfg,sheets_url:sheetsUrl})});
+  if(res && res.ok){
+    _campConfigCache = cfg;
+    toast('Configuração salva!');
+  } else {
+    toast(res?.error||'Erro ao salvar.','red');
+  }
 }
-function loadCampConfigToForm(){
-  const cfg=getCampConfig();
+
+async function loadCampConfigToForm(){
+  const data = await loadConfig();
+  if(!data) return;
+  const cfg = data.camps || getCampConfig();
   ['c1','c2','c3'].forEach((id,i)=>{
-    $(id+'-nome').value=cfg[i].nome||'';
-    $(id+'-kw').value=cfg[i].kw||'';
-    $(id+'-click').value=cfg[i].click||'clicks';
+    $(id+'-nome').value=cfg[i]?.nome||'';
+    $(id+'-kw').value=cfg[i]?.kw||'';
+    $(id+'-click').value=cfg[i]?.click||'clicks';
   });
-  const sheetsUrl=localStorage.getItem('copa_sheets_url')||'';
-  $('sheets-url').value=sheetsUrl;
+  $('sheets-url').value = data.sheets_url||'';
 }
 
 // SHEETS
-function saveAndTestSheets(){
+async function saveAndTestSheets(){
+  // Salva junto com as campanhas atuais
+  const cfg=[
+    {nome:$('c1-nome').value.trim(),kw:$('c1-kw').value.trim().toUpperCase(),click:$('c1-click').value},
+    {nome:$('c2-nome').value.trim(),kw:$('c2-kw').value.trim().toUpperCase(),click:$('c2-click').value},
+    {nome:$('c3-nome').value.trim(),kw:$('c3-kw').value.trim().toUpperCase(),click:$('c3-click').value},
+  ];
   const url=$('sheets-url').value.trim();
-  localStorage.setItem('copa_sheets_url',url);
-  toast('URL salva! Acesse a aba "Dados Orgânicos" para verificar.');
+  const res = await apiFetch('/api/config',{method:'POST',body:JSON.stringify({camps:cfg,sheets_url:url})});
+  if(res && res.ok){
+    _campConfigCache = cfg;
+    toast('URL salva! Acesse a aba "Dados Orgânicos" para verificar.');
+  } else {
+    toast(res?.error||'Erro ao salvar URL.','red');
+  }
 }
+
 async function loadOrganico(){
-  const url=localStorage.getItem('copa_sheets_url');
-  if(!url){$('org-head').innerHTML='';$('org-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ico">📊</div><h3>URL não configurada</h3><p>Acesse o painel de admin e configure a URL do Google Sheets.</p></div></td></tr>`;return;}
+  // Busca URL do Sheets do backend
+  const data = await loadConfig();
+  const url = data?.sheets_url;
+  if(!url){
+    $('org-head').innerHTML='';
+    $('org-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ico">📊</div><h3>URL não configurada</h3><p>Acesse o painel de admin e configure a URL do Google Sheets.</p></div></td></tr>`;
+    return;
+  }
   loading(true,'Importando dados orgânicos...');
   try{
     const res=await fetch(url);
     const text=await res.text();
-    const rows=text.trim().split('\n').map(r=>r.split(',').map(c=>c.replace(/^"|"$/g,'').trim()));
+    // Parse CSV respeitando campos entre aspas com vírgulas
+    function parseCSVLine(line){
+      const result=[];let cur='';let inQ=false;
+      for(let i=0;i<line.length;i++){
+        const ch=line[i];
+        if(ch==='"'){inQ=!inQ;}
+        else if(ch===','&&!inQ){result.push(cur.trim());cur='';}
+        else{cur+=ch;}
+      }
+      result.push(cur.trim());
+      return result;
+    }
+    const lines=text.trim().split('\n');
+    const rows=lines.map(parseCSVLine);
     if(rows.length<2){$('org-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ico">📋</div><h3>Planilha vazia</h3></div></td></tr>`;return;}
     const headers=rows[0];
     $('org-head').innerHTML=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;
-    $('org-body').innerHTML=rows.slice(1).map(r=>`<tr>${r.map(c=>`<td>${c||'—'}</td>`).join('')}</tr>`).join('');
-  }catch(e){$('org-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ico">⚠️</div><h3>Erro ao carregar</h3><p>${e.message}</p></div></td></tr>`;}
+    $('org-body').innerHTML=rows.slice(1).filter(r=>r.some(c=>c)).map(r=>`<tr>${headers.map((_,i)=>`<td>${r[i]||'—'}</td>`).join('')}</tr>`).join('');
+  }catch(e){
+    $('org-body').innerHTML=`<tr><td colspan="5"><div class="empty"><div class="ico">⚠️</div><h3>Erro ao carregar</h3><p>${e.message}</p></div></td></tr>`;
+  }
   finally{loading(false);}
 }
 
@@ -442,7 +500,11 @@ function startApp(){
   }else{
     $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
     $('ds').value=mStart();$('de').value=today();
-    renderCampHeader();loadData();
+    // Carrega config do backend antes de renderizar
+    loadConfig().then(()=>{
+      renderCampHeader();
+      loadData();
+    });
   }
 }
 
@@ -454,13 +516,24 @@ async function apiFetch(path,opts={}){
 
 function renderCampHeader(){
   const cfg=getCampConfig();
-  $('camp-header').innerHTML=cfg.map((c,i)=>`
-    <div class="camp-slot" style="--slot-color:${CAMP_COLORS[i]}">
+  // Só mostra campanhas que têm palavra-chave configurada
+  const active=cfg.filter(c=>c.kw);
+  if(!active.length){
+    $('camp-header').innerHTML=`<div style="grid-column:1/-1;padding:12px;font-size:13px;color:var(--muted);">Nenhuma campanha configurada. Solicite ao administrador.</div>`;
+    return;
+  }
+  // Monta só os slots ativos, mantendo a cor original do índice
+  $('camp-header').innerHTML=cfg.map((c,i)=>{
+    if(!c.kw) return ''; // omite não configuradas
+    return `<div class="camp-slot" style="--slot-color:${CAMP_COLORS[i]}">
       <div class="camp-slot-num">Campanha ${i+1}</div>
       <div class="camp-slot-name">${c.nome||'—'}</div>
-      <div class="camp-slot-kw">${c.kw||'Não configurada'}</div>
-      ${c.kw?`<div class="camp-slot-click">📊 ${CLICK_LABELS[c.click]||'Cliques no Link'}</div>`:''}
-    </div>`).join('');
+      <div class="camp-slot-kw">${c.kw}</div>
+      <div class="camp-slot-click">📊 ${CLICK_LABELS[c.click]||'Cliques no Link'}</div>
+    </div>`;
+  }).join('');
+  // Ajusta o grid dinamicamente
+  $('camp-header').style.gridTemplateColumns=`repeat(${active.length},1fr)`;
 }
 
 async function loadData(){
@@ -531,7 +604,7 @@ function renderComparativo(rows,kpi){
   const cfg=getCampConfig();
   // Agrupa por campanha configurada
   const cards=cfg.map((c,i)=>{
-    if(!c.kw)return{cfg:c,color:CAMP_COLORS[i],data:null};
+    if(!c.kw)return null; // pula não configuradas
     const campRows=rows.filter(r=>(r.CAMPAIGN_NAME||'').toUpperCase().includes(c.kw));
     const imp=campRows.reduce((a,r)=>a+(r.impressions||0),0);
     const clk=campRows.reduce((a,r)=>a+(r[c.click]||0),0);
@@ -540,9 +613,19 @@ function renderComparativo(rows,kpi){
     const ctr=imp?((clk/imp)*100):0;
     const vtr=imp?((tp/imp)*100):0;
     return{cfg:c,color:CAMP_COLORS[i],data:{imp,clk,tp,v100,ctr,vtr,clickLabel:CLICK_LABELS[c.click]}};
-  });
-  $('camp-compare').innerHTML=cards.map(c=>{
-    if(!c.data)return`<div class="cmp-card"><div class="cmp-head" style="border-top:3px solid ${c.color};"><div class="cmp-name">${c.cfg.nome||'Não configurada'}</div></div><div class="cmp-body"><div class="empty" style="padding:24px;"><div class="ico">⚙️</div><p>Configure no painel admin</p></div></div></div>`;
+  }).filter(Boolean); // remove nulls
+
+  const activeCount=cards.length;
+  const compareEl=$('camp-compare');
+  compareEl.style.gridTemplateColumns=activeCount?`repeat(${activeCount},1fr)`:'1fr';
+
+  if(!activeCount){
+    compareEl.innerHTML=`<div class="cmp-card"><div class="cmp-body"><div class="empty" style="padding:24px;"><div class="ico">⚙️</div><p>Nenhuma campanha configurada. Solicite ao administrador.</p></div></div></div>`;
+    $('influenciadores-section').innerHTML='';
+    return;
+  }
+
+  compareEl.innerHTML=cards.map(c=>{
     const d=c.data;
     return`<div class="cmp-card" style="border-top:3px solid ${c.color};">
       <div class="cmp-head"><div class="cmp-name">${c.cfg.nome}</div><span style="font-size:11px;background:rgba(255,255,255,.06);padding:3px 8px;border-radius:20px;color:var(--muted);">${d.clickLabel}</span></div>
@@ -558,10 +641,8 @@ function renderComparativo(rows,kpi){
   }).join('');
 
   // Influenciadores por campanha
-  $('influenciadores-section').innerHTML=cards.map((c,i)=>{
-    if(!c.data)return'';
+  $('influenciadores-section').innerHTML=cards.map(c=>{
     const campRows=rows.filter(r=>(r.CAMPAIGN_NAME||'').toUpperCase().includes(c.cfg.kw));
-    // Agrupar por influenciador (via CAMPAIGN_NAME por enquanto, pois by_campaign não retorna influenciador)
     const byPlat={};
     campRows.forEach(r=>{
       const k=r.platform||'Outros';
