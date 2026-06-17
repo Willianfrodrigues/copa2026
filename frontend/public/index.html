@@ -674,8 +674,8 @@ async function loadOrganico(){
     renderOrgCards();
     renderOrgPodium();
     renderOrgSubTabs();
-    const first=ORG_SHEETS.find(s=>_orgData[s.id]);
-    if(first) showOrgSheet(first.id);
+    // Abre vista unificada por padrão
+    showOrgSheet('all');
   }finally{loading(false);}
 }
 
@@ -747,9 +747,9 @@ function getSheetTotals(rows){
 }
 
 function renderOrgCards(){
-  // Grand totals across all sheets
+  // Grand totals — apenas campanhas (florida, bra, rr), não Dados Gerais
   let grandImp=0, grandView=0;
-  ORG_SHEETS.forEach(s=>{
+  ORG_SHEETS.filter(s=>s.id!=='geral').forEach(s=>{
     const t=getSheetTotals(_orgData[s.id]);
     grandImp+=t.imp; grandView+=t.view;
   });
@@ -850,15 +850,73 @@ function renderOrgPodium(){
 }
 
 function renderOrgSubTabs(){
-  const tabs=ORG_SHEETS.filter(s=>_orgData[s.id]);
-  $('org-subtabs').style.display=tabs.length>1?'flex':'none';
-  $('org-subtabs').innerHTML=tabs.map(s=>`<button class="tab org-subtab" id="orgtab-${s.id}" onclick="showOrgSheet('${s.id}')" style="border-top:2px solid ${s.color};">${s.icon} ${s.label}</button>`).join('');
+  const tabs=ORG_SHEETS.filter(s=>_orgData[s.id]&&s.id!=='geral');
+  $('org-subtabs').style.display=tabs.length?'flex':'none';
+  // "Todas" unificada + abas individuais
+  const allBtn=`<button class="tab org-subtab" id="orgtab-all" onclick="showOrgSheet('all')" style="border-top:2px solid #F5C842;">🔀 Todas as Campanhas</button>`;
+  $('org-subtabs').innerHTML=allBtn+tabs.map(s=>`<button class="tab org-subtab" id="orgtab-${s.id}" onclick="showOrgSheet('${s.id}')" style="border-top:2px solid ${s.color};">${s.icon} ${s.label}</button>`).join('');
 }
 
 function showOrgSheet(id){
   _orgActive=id;
   document.querySelectorAll('.org-subtab').forEach(t=>t.classList.remove('active'));
   const el=$('orgtab-'+id);if(el)el.classList.add('active');
+
+  // Vista unificada: junta todas as 3 campanhas (florida, bra, rr)
+  if(id==='all'){
+    const campSheets=ORG_SHEETS.filter(s=>s.id!=='geral'&&_orgData[s.id]);
+    if(!campSheets.length) return;
+
+    // Usa headers da primeira planilha disponível
+    const headers=campSheets[0]&&_orgData[campSheets[0].id][0];
+    const idxInfl=headers.findIndex(h=>/influenc/i.test(h));
+    const idxImp =headers.findIndex(h=>/impress/i.test(h));
+    const idxView=headers.findIndex(h=>/view/i.test(h));
+
+    // Agrega por influenciador somando todas as planilhas
+    const merged={};
+    campSheets.forEach(s=>{
+      const rows=_orgData[s.id];
+      const h=rows[0];
+      const iI=h.findIndex(x=>/influenc/i.test(x));
+      const iImp=h.findIndex(x=>/impress/i.test(x));
+      const iView=h.findIndex(x=>/view/i.test(x));
+      rows.slice(1).filter(r=>r.some(c=>c)).forEach(r=>{
+        const name=(r[iI>=0?iI:0]||'').trim();
+        if(!name||/total/i.test(name)) return;
+        if(!merged[name]) merged[name]={influenciador:name,imp:0,view:0,campanha:[]};
+        merged[name].imp  += parseOrgNum(r[iImp>=0?iImp:2]||'');
+        merged[name].view += parseOrgNum(r[iView>=0?iView:3]||'');
+        if(!merged[name].campanha.includes(s.label)) merged[name].campanha.push(s.label);
+      });
+    });
+
+    const rows=Object.values(merged).sort((a,b)=>b.imp-a.imp);
+    const totalImp=rows.reduce((s,r)=>s+r.imp,0);
+    const totalView=rows.reduce((s,r)=>s+r.view,0);
+    const maxImp=Math.max(...rows.map(r=>r.imp),1);
+
+    if($('org-tbl-title'))$('org-tbl-title').textContent='🔀 Todas as Campanhas — Unificado';
+    if($('org-tbl-total'))$('org-tbl-total').textContent=`${rows.length} influenciadores`;
+
+    $('org-head').innerHTML=`<tr><th>Influenciador</th><th>Impressões</th><th>Views</th><th>Campanhas</th></tr>`;
+    $('org-body').innerHTML=[
+      // Linha de total no topo
+      `<tr style="background:var(--bg2);font-weight:700;border-bottom:2px solid var(--border);"><td>TOTAL</td><td>${fmtOrgNum(String(totalImp))}</td><td>${fmtOrgNum(String(totalView))}</td><td style="color:var(--muted);font-size:11px;">${campSheets.length} campanhas</td></tr>`,
+      ...rows.map(r=>{
+        const pct=(r.imp/maxImp*100).toFixed(1);
+        return`<tr>
+          <td style="font-weight:600;">${r.influenciador}</td>
+          <td><div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${pct}%;background:#F5C842;"></div></div><span class="bar-v">${fmtOrgNum(String(r.imp))}</span></div></td>
+          <td>${fmtOrgNum(String(r.view))}</td>
+          <td style="font-size:11px;color:var(--muted);">${r.campanha.join(', ')}</td>
+        </tr>`;
+      })
+    ].join('');
+    return;
+  }
+
+  // Vista individual por aba
   const s=ORG_SHEETS.find(x=>x.id===id);
   const rows=_orgData[id];
   if(!rows){$('org-head').innerHTML='';$('org-body').innerHTML='';return;}
@@ -981,10 +1039,10 @@ function renderKPIs(k){
   const clickKey=cfg.find(c=>c.kw)?.click||'clicks';
   const clickLabel=CLICK_LABELS[clickKey]||'Cliques';
 
-  // Soma impressões orgânicas
+  // Soma impressões orgânicas (apenas campanhas: florida, bra, rr — não Dados Gerais)
   let orgImp=0;
   if(typeof _orgData !== 'undefined'){
-    ORG_SHEETS.forEach(s=>{ orgImp+=getSheetTotals(_orgData[s.id]).imp; });
+    ORG_SHEETS.filter(s=>s.id!=='geral').forEach(s=>{ orgImp+=getSheetTotals(_orgData[s.id]).imp; });
   }
   const totalImp = (Number(k.impressions)||0) + orgImp;
 
