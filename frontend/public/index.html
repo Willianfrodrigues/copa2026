@@ -651,7 +651,7 @@ async function saveAndTestSheets(){
   else toast(res?.error||'Erro ao salvar.','red');
 }
 
-async function loadOrganico(silent=false){
+async function loadOrganico(){
   const data=await loadConfig();
   const urls=data?.sheets_urls||{};
   if(!urls.geral&&data?.sheets_url) urls.geral=data.sheets_url;
@@ -666,7 +666,7 @@ async function loadOrganico(silent=false){
     return;
   }
 
-  if(!silent) loading(true,'Importando planilhas...');
+  loading(true,'Importando planilhas...');
   try{
     const results=await Promise.all(ORG_SHEETS.map(s=>fetchCSV(urls[s.id])));
     _orgData={};
@@ -674,8 +674,9 @@ async function loadOrganico(silent=false){
     renderOrgCards();
     renderOrgPodium();
     renderOrgSubTabs();
+    // Abre vista unificada por padrão
     showOrgSheet('all');
-  }finally{if(!silent) loading(false);}
+  }finally{loading(false);}
 }
 
 function fmtOrgNum(v){
@@ -979,7 +980,6 @@ function startApp(){
   $('login-screen').style.display='none';
   $('app').style.display='block';
   const role = USER&&USER.role;
-
   if(role==='admin'){
     $('admin-panel').style.display='block';
     $('dash-section').style.display='none';
@@ -992,20 +992,23 @@ function startApp(){
     $('topbar-dates').style.display='flex';
     $('ds').value=mStart();
     $('de').value=today();
-    loadConfig()
-      .then(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); })
-      .catch(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); });
+    // Renderiza imediatamente com cache vazio, depois atualiza
+    renderCampHeader();
+    loadData();
+    // Busca config em background para atualizar header
+    loadConfig().then(()=>{ renderCampHeader(); }).catch(()=>{});
   }
 }
 
 async function apiFetch(path,opts={}){
-  const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
-  if(res.status===401){
-    // Só faz logout se não for o config (config pode falhar sem quebrar a sessão)
-    if(!path.includes('/api/config')) doLogout();
-    throw new Error('401');
+  try{
+    const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
+    if(res.status===401){doLogout();return null;}
+    return res.json();
+  }catch(e){
+    console.error('apiFetch error:',path,e);
+    return null;
   }
-  return res.json();
 }
 
 function renderCampHeader(){
@@ -1041,8 +1044,7 @@ async function loadData(){
       apiFetch(`/api/data?${p}&type=by_campaign`),
       apiFetch(`/api/data?${p}&type=by_influencer`),
     ]);
-    // Carrega orgânico em background sem bloquear a tela
-    if(!Object.keys(_orgData).length) loadOrganico(true);
+    // Carrega orgânico silenciosamente se ainda não foi carregado
     if(kpi)renderKPIs(kpi);
     if(series)renderCharts(series.rows||[]);
     if(byCamp){allCRows=byCamp.rows||[];renderCampTable(allCRows);renderComparativo(allCRows,kpi);}
