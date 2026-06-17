@@ -966,8 +966,6 @@ async function doLogin(){
     TOKEN=data.token;USER=data;
     sessionStorage.setItem('copa_token',TOKEN);
     sessionStorage.setItem('copa_user',JSON.stringify(USER));
-    // DEBUG
-    alert('LOGIN OK | role: '+USER.role+' | username: '+USER.username);
     startApp();
   }catch(e){$('lerr').textContent=e.message;$('lerr').style.display='block';}
   finally{btn.disabled=false;btn.textContent='Entrar';}
@@ -982,19 +980,6 @@ function startApp(){
   $('login-screen').style.display='none';
   $('app').style.display='block';
   const role = USER&&USER.role;
-
-  // DEBUG TEMPORÁRIO - remove depois
-  const dbg=document.createElement('div');
-  dbg.id='dbg-overlay';
-  dbg.style='position:fixed;top:50px;left:50%;transform:translateX(-50%);background:#1a2a1a;border:2px solid #F5C842;border-radius:10px;padding:20px;z-index:9999;font-family:monospace;font-size:13px;color:#fff;min-width:320px;';
-  dbg.innerHTML=`<div style="color:#F5C842;font-weight:bold;margin-bottom:8px;">🔍 DEBUG startApp</div>
-    <div>role: <strong style="color:#1EC99B">${role||'NULL'}</strong></div>
-    <div>USER: <strong style="color:#1EC99B">${USER?'ok':'NULL'}</strong></div>
-    <div>TOKEN: <strong style="color:#1EC99B">${TOKEN?'ok':'NULL'}</strong></div>
-    <div>dash-section: <strong style="color:#1EC99B">${$('dash-section')?'found':'NOT FOUND'}</strong></div>
-    <div>admin-panel: <strong style="color:#1EC99B">${$('admin-panel')?'found':'NOT FOUND'}</strong></div>
-    <button onclick="document.getElementById('dbg-overlay').remove()" style="margin-top:10px;padding:4px 12px;background:#F5C842;color:#000;border:none;border-radius:6px;cursor:pointer;">Fechar</button>`;
-  document.body.appendChild(dbg);
 
   if(role==='admin'){
     $('admin-panel').style.display='block';
