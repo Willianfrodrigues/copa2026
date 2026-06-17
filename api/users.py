@@ -28,23 +28,6 @@ class handler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             _require_admin(self.headers)
-            from urllib.parse import urlparse, parse_qs
-            qs = parse_qs(urlparse(self.path).query)
-            action = qs.get('action', [''])[0]
-
-            if action == 'logs':
-                conn = get_db(); cur = conn.cursor()
-                cur.execute("""
-                    SELECT username, ip, user_agent, success,
-                           to_char(created_at AT TIME ZONE 'America/Sao_Paulo', 'DD/MM/YYYY HH24:MI:SS') AS ts
-                    FROM login_log
-                    ORDER BY created_at DESC
-                    LIMIT 200
-                """)
-                rows = [{"username":r[0],"ip":r[1],"user_agent":r[2],"success":r[3],"ts":r[4]} for r in cur.fetchall()]
-                cur.close(); conn.close()
-                return self._send(json_response(rows))
-
             conn = get_db(); cur = conn.cursor()
             cur.execute("SELECT username, role, client, campaigns FROM users ORDER BY id")
             rows = [{"username":r[0],"role":r[1],"client":r[2],"campaigns":list(r[3] or [])} for r in cur.fetchall()]
