@@ -374,20 +374,6 @@ tbody td{padding:11px 15px;font-size:13px;}
           <button class="btn-g" onclick="adminAdd()" style="height:38px;">+ Adicionar</button>
         </div>
         <table><thead><tr><th>Usuário</th><th>Nome</th><th>Palavras-chave</th><th>Perfil</th><th></th></tr></thead><tbody id="adm-tbody"></tbody></table>
-      <!-- HISTÓRICO DE ACESSO -->
-      <div class="adm-section">
-        <div class="adm-section-ttl" style="display:flex;align-items:center;justify-content:space-between;">
-          <span>📋 Histórico de Acesso</span>
-          <button class="btn-gold" style="font-size:11px;padding:5px 12px;" onclick="loadAccessLog()">↻ Atualizar</button>
-        </div>
-        <div style="overflow-x:auto;">
-          <table id="log-table">
-            <thead><tr><th>Data / Hora</th><th>Usuário</th><th>IP</th><th>Status</th><th>Dispositivo</th></tr></thead>
-            <tbody id="log-tbody"><tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Clique em Atualizar para carregar</td></tr></tbody>
-          </table>
-        </div>
-      </div>
-
       </div><!-- fim admin-panel -->
 
     <!-- DASHBOARD -->
@@ -975,20 +961,14 @@ function doLogout(){
   $('inp-u').value='';$('inp-p').value='';destroyCharts();
 }
 function startApp(){
-  try{
-    $('login-screen').style.display='none';$('app').style.display='block';
-    if(USER.role==='admin'){
-      $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
-      loadCampConfigToForm();loadAdminUsers();
-      setTimeout(()=>loadAccessLog(),500);
-    }else{
-      $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
-      $('ds').value=mStart();$('de').value=today();
-      loadConfig().then(()=>{ renderCampHeader(); loadData(); });
-    }
-  }catch(e){
-    console.error('startApp error:',e);
-    $('login-screen').style.display='flex';$('app').style.display='none';
+  $('login-screen').style.display='none';$('app').style.display='block';
+  if(USER.role==='admin'){
+    $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
+    loadCampConfigToForm();loadAdminUsers();
+  }else{
+    $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
+    $('ds').value=mStart();$('de').value=today();
+    loadConfig().then(()=>{ renderCampHeader(); loadData(); });
   }
 }
 
@@ -1335,29 +1315,6 @@ function switchTab(name,el){
   if(name==='influenciadores')renderInflTable();
 }
 
-async function loadAccessLog(){
-  const tbody=$('log-tbody');
-  tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">Carregando...</td></tr>`;
-  const data=await apiFetch('/api/users?action=logs');
-  if(!data||!data.length){
-    tbody.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:16px;">Nenhum registro ainda.</td></tr>`;
-    return;
-  }
-  tbody.innerHTML=data.map(r=>{
-    const ua=r.user_agent||'';
-    const device=ua.includes('Mobile')||ua.includes('Android')||ua.includes('iPhone')?'📱 Mobile':'🖥️ Desktop';
-    const status=r.success
-      ?`<span style="color:#1EC99B;font-weight:700;">✅ Sucesso</span>`
-      :`<span style="color:#F05A5A;font-weight:700;">❌ Falha</span>`;
-    return`<tr style="${!r.success?'opacity:.6':''}">
-      <td style="font-size:12px;white-space:nowrap;">${r.ts||'—'}</td>
-      <td style="font-weight:600;">${r.username}</td>
-      <td style="font-size:11px;color:var(--muted);font-family:monospace;">${r.ip||'—'}</td>
-      <td>${status}</td>
-      <td style="font-size:11px;color:var(--muted);">${device}</td>
-    </tr>`;
-  }).join('');
-}
 
 // ADMIN USERS
 async function loadAdminUsers(){
