@@ -372,13 +372,35 @@ function getCampConfig(){
 }
 
 async function loadConfig(){
-  // Busca config do backend (funciona para admin e cliente)
   try{
     const data = await apiFetch('/api/config');
     if(data && data.camps){
-      _campConfigCache = data.camps;
+      // Só usa o resultado do backend se ao menos 1 campanha tiver kw configurada
+      const hasAny = data.camps.some(c=>c.kw && c.kw.trim());
+      if(hasAny){
+        _campConfigCache = data.camps;
+        return data;
+      }
     }
-    return data;
+    // Backend não tem config ainda — tenta migrar do localStorage (sessão do admin)
+    const localCamps = localStorage.getItem('copa_camps');
+    const localSheets = localStorage.getItem('copa_sheets_url')||'';
+    if(localCamps){
+      const camps = JSON.parse(localCamps);
+      const hasLocal = camps.some(c=>c.kw && c.kw.trim());
+      if(hasLocal){
+        _campConfigCache = camps;
+        // Se for admin, migra automaticamente pro backend
+        if(USER && USER.role==='admin'){
+          apiFetch('/api/config',{method:'POST',body:JSON.stringify({camps,sheets_url:localSheets})})
+            .then(()=>toast('Config migrada do navegador para o servidor!'));
+        }
+        return {camps, sheets_url: localSheets};
+      }
+    }
+    // Retorna o que veio do backend mesmo vazio (para admin preencher)
+    _campConfigCache = data?.camps || [{nome:'Campanha 1',kw:'',click:'clicks'},{nome:'Campanha 2',kw:'',click:'clicks'},{nome:'Campanha 3',kw:'',click:'clicks'}];
+    return data || {camps:_campConfigCache, sheets_url:''};
   }catch(e){
     console.warn('Erro ao carregar config:',e);
     return null;
@@ -411,6 +433,14 @@ async function loadCampConfigToForm(){
     $(id+'-click').value=cfg[i]?.click||'clicks';
   });
   $('sheets-url').value = data.sheets_url||'';
+
+  // Avisa admin se a config ainda não foi salva no servidor
+  const savedOnServer = cfg.some(c=>c.kw && c.kw.trim());
+  const localCamps = localStorage.getItem('copa_camps');
+  const hasLocal = localCamps && JSON.parse(localCamps).some(c=>c.kw && c.kw.trim());
+  if(!savedOnServer && hasLocal){
+    toast('⚠️ Config detectada no navegador. Clique em "Salvar Configuração" para publicar para todos os clientes!','red');
+  }
 }
 
 // SHEETS
