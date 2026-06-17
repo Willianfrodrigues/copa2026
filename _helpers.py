@@ -97,7 +97,7 @@ def build_campaign_filter(user: dict) -> str:
         return "1=1"
     keywords = user.get("campaigns", [])
     if not keywords:
-        return "1=0"
+        return "1=1"  # lista vazia = acesso total (conforme UI: "deixe em branco para ver todas")
     # Escape single quotes and percent signs to avoid SQL injection
     safe_kws = [kw.upper().replace("'", "''").replace("\\", "\\\\") for kw in keywords]
     conditions = " OR ".join(
