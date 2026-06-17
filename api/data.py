@@ -105,21 +105,29 @@ def get_by_campaign(camp_filter, start, end):
 def get_by_influencer(camp_filter, start, end):
     q = f"""
     SELECT
-        COALESCE(INFLUENCIADOR, 'Sem Influenciador')           AS influenciador,
+        -- Usa INFLUENCIADOR; se nulo, usa AD_NAME. Remove sufixos de mercado (- BR, - US, etc.)
+        TRIM(REGEXP_REPLACE(
+            COALESCE(
+                NULLIF(TRIM(INFLUENCIADOR), ''),
+                NULLIF(TRIM(AD_NAME), ''),
+                'Sem Influenciador'
+            ),
+            r'\s*-\s*(BR|US|PT|MX|AR|CL|CO)\s*(C\d+)?\s*$', ''
+        ))                                                         AS influenciador,
         platform,
         CAMPAIGN_NAME,
-        SUM(COALESCE(IMPRESSIONS,   0))                        AS impressions,
-        SUM(COALESCE(CLICKS_LINK,   0))                        AS clicks_link,
-        SUM(COALESCE(CLICKS,        0))                        AS clicks,
-        SUM(COALESCE(THRUPLAY,      0))                        AS thruplay,
-        SUM(COALESCE(VIEWS25,       0))                        AS views25,
-        SUM(COALESCE(VIEWS50,       0))                        AS views50,
-        SUM(COALESCE(VIEWS75,       0))                        AS views75,
-        SUM(COALESCE(VIEWS100,      0))                        AS views100,
-        SUM(COALESCE(total_comments,       0))                 AS comments,
-        SUM(COALESCE(total_reacoes,        0))                 AS reactions,
-        SUM(COALESCE(total_salvamentos,    0))                 AS saves,
-        SUM(COALESCE(total_compartilhamento, 0))               AS shares,
+        SUM(COALESCE(IMPRESSIONS,   0))                            AS impressions,
+        SUM(COALESCE(CLICKS_LINK,   0))                            AS clicks_link,
+        SUM(COALESCE(CLICKS,        0))                            AS clicks,
+        SUM(COALESCE(THRUPLAY,      0))                            AS thruplay,
+        SUM(COALESCE(VIEWS25,       0))                            AS views25,
+        SUM(COALESCE(VIEWS50,       0))                            AS views50,
+        SUM(COALESCE(VIEWS75,       0))                            AS views75,
+        SUM(COALESCE(VIEWS100,      0))                            AS views100,
+        SUM(COALESCE(total_comments,       0))                     AS comments,
+        SUM(COALESCE(total_reacoes,        0))                     AS reactions,
+        SUM(COALESCE(total_salvamentos,    0))                     AS saves,
+        SUM(COALESCE(total_compartilhamento, 0))                   AS shares,
         SAFE_DIVIDE(
             SUM(COALESCE(CLICKS_LINK, 0)),
             NULLIF(SUM(COALESCE(IMPRESSIONS, 0)), 0)
