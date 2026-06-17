@@ -747,59 +747,49 @@ function getSheetTotals(rows){
 }
 
 function renderOrgCards(){
-  // Grand totals — apenas campanhas (florida, bra, rr), não Dados Gerais
-  let grandImp=0, grandView=0;
+  // Soma florida + bra + rr
+  let grandImp=0, grandView=0, grandInfl=0, grandPend=0;
   ORG_SHEETS.filter(s=>s.id!=='geral').forEach(s=>{
-    const t=getSheetTotals(_orgData[s.id]);
-    grandImp+=t.imp; grandView+=t.view;
+    const rows=_orgData[s.id]; if(!rows) return;
+    const t=getSheetTotals(rows); grandImp+=t.imp; grandView+=t.view;
+    const h=rows[0]; const data=rows.slice(1).filter(r=>r.some(c=>c));
+    const iI=h.findIndex(x=>/influenc/i.test(x));
+    const iImp=h.findIndex(x=>/impress/i.test(x));
+    const inflRows=data.filter(r=>r[Math.max(iI,0)]&&!/total/i.test(r[Math.max(iI,0)]||''));
+    grandInfl+=inflRows.length;
+    grandPend+=inflRows.filter(r=>{const v=r[iImp>=0?iImp:2]||'';return v==='-'||v===''||v.toLowerCase()==='pendente';}).length;
   });
 
-  // Grand total banner
-  const banner = grandImp>0 ? `
-    <div style="grid-column:1/-1;background:linear-gradient(135deg,rgba(245,200,66,.15),rgba(245,200,66,.05));border:1px solid var(--border2);border-radius:var(--radius);padding:16px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:4px;">
-      <div style="display:flex;align-items:center;gap:10px;">
-        <span style="font-size:24px;">📊</span>
-        <div>
-          <div style="font-size:10px;font-weight:700;color:var(--gold);text-transform:uppercase;letter-spacing:1px;">Total Geral — Todas as Campanhas Orgânicas</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Soma de todas as abas configuradas</div>
-        </div>
-      </div>
-      <div style="display:flex;gap:24px;flex-wrap:wrap;">
-        <div style="text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;color:var(--gold);">${fmtOrgNum(String(grandImp))}</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Impressões</div>
-        </div>
-        <div style="text-align:center;">
-          <div style="font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:800;color:var(--green);">${fmtOrgNum(String(grandView))}</div>
-          <div style="font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">Views</div>
-        </div>
-      </div>
-    </div>` : '';
+  // Card "Dados Gerais" = soma das 3 campanhas
+  const geralCard = grandImp>0 ? `<div class="kpi-card" style="--ac:#F5C842;cursor:pointer;transition:transform .2s;" onclick="showOrgSheet('all')" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+    <div class="kpi-lbl">🏠 Dados Gerais</div>
+    <div class="kpi-val" style="font-size:22px;margin-bottom:2px;">${fmtOrgNum(String(grandImp))}</div>
+    <div class="kpi-sub">impressões totais</div>
+    <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:4px;">
+      <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👁 Views</span><strong>${fmtOrgNum(String(grandView))}</strong></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👤 Influenciadores</span><strong>${grandInfl}</strong></div>
+      <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">Status</span>${grandPend>0?`<span style="color:#F5C842;">⏳ ${grandPend} pendentes</span>`:`<span style="color:#1EC99B;">✅ Entregue</span>`}</div>
+    </div>
+  </div>` : `<div class="kpi-card" style="--ac:#F5C842;opacity:.35;"><div class="kpi-lbl">🏠 Dados Gerais</div><div class="kpi-val nd">Aguardando dados</div></div>`;
 
-  const cards = ORG_SHEETS.map(s=>{
+  const cards = ORG_SHEETS.filter(s=>s.id!=='geral').map(s=>{
     const rows=_orgData[s.id];
     if(!rows) return `<div class="kpi-card" style="--ac:${s.color};opacity:.35;"><div class="kpi-lbl">${s.icon} ${s.label}</div><div class="kpi-val nd">Não configurada</div></div>`;
-
     const headers=rows[0];
     const data=rows.slice(1).filter(r=>r.some(c=>c));
     const idxInfl=headers.findIndex(h=>/influenc/i.test(h));
-    const idxImp =headers.findIndex(h=>/impress/i.test(h));
-
-    const {imp:totImpN, view:totViewN}=getSheetTotals(rows);
-    const totImp  = totImpN  ? fmtOrgNum(String(totImpN))  : '—';
-    const totView = totViewN ? fmtOrgNum(String(totViewN)) : '—';
-
+    const idxImp=headers.findIndex(h=>/impress/i.test(h));
+    const {imp:totImpN,view:totViewN}=getSheetTotals(rows);
+    const totImp=totImpN?fmtOrgNum(String(totImpN)):'—';
+    const totView=totViewN?fmtOrgNum(String(totViewN)):'—';
     const inflRows=data.filter(r=>r[Math.max(idxInfl,0)]&&!/total/i.test(r[Math.max(idxInfl,0)]||''));
     const pendentes=inflRows.filter(r=>{const v=r[idxImp>=0?idxImp:2]||'';return v==='-'||v===''||v.toLowerCase()==='pendente';}).length;
-
-    // % of grand total
-    const pct = grandImp>0 ? ((totImpN/grandImp)*100).toFixed(1) : 0;
-
-    return `<div class="kpi-card" style="--ac:${s.color};cursor:pointer;transition:transform .2s,box-shadow .2s;" onclick="showOrgSheet('${s.id}')" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
+    const pct=grandImp>0?((totImpN/grandImp)*100).toFixed(1):0;
+    return `<div class="kpi-card" style="--ac:${s.color};cursor:pointer;transition:transform .2s;" onclick="showOrgSheet('${s.id}')" onmouseenter="this.style.transform='translateY(-3px)'" onmouseleave="this.style.transform=''">
       <div class="kpi-lbl">${s.icon} ${s.label}</div>
       <div class="kpi-val" style="font-size:22px;margin-bottom:2px;">${totImp}</div>
       <div class="kpi-sub">impressões</div>
-      ${grandImp>0?`<div style="margin-top:6px;"><div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${s.color};border-radius:2px;transition:width .8s;"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px;">${pct}% do total</div></div>`:''}
+      ${grandImp>0?`<div style="margin-top:6px;"><div style="height:4px;background:var(--bg);border-radius:2px;overflow:hidden;"><div style="width:${pct}%;height:100%;background:${s.color};border-radius:2px;"></div></div><div style="font-size:10px;color:var(--muted);margin-top:3px;">${pct}% do total</div></div>`:''}
       <div style="margin-top:10px;border-top:1px solid var(--border);padding-top:8px;display:flex;flex-direction:column;gap:4px;">
         <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👁 Views</span><strong>${totView}</strong></div>
         <div style="display:flex;justify-content:space-between;font-size:11px;"><span style="color:var(--muted);">👤 Influenciadores</span><strong>${inflRows.length}</strong></div>
@@ -808,12 +798,12 @@ function renderOrgCards(){
     </div>`;
   }).join('');
 
-  $('org-cards').innerHTML = banner + cards;
+  $('org-cards').innerHTML = geralCard + cards;
 }
 
 function renderOrgPodium(){
   const ranking={};
-  ORG_SHEETS.forEach(s=>{
+  ORG_SHEETS.filter(s=>s.id!=='geral').forEach(s=>{
     const rows=_orgData[s.id];if(!rows)return;
     const h=rows[0];
     const iI=h.findIndex(x=>/influenc/i.test(x));
@@ -867,27 +857,23 @@ function showOrgSheet(id){
     const campSheets=ORG_SHEETS.filter(s=>s.id!=='geral'&&_orgData[s.id]);
     if(!campSheets.length) return;
 
-    // Usa headers da primeira planilha disponível
-    const headers=campSheets[0]&&_orgData[campSheets[0].id][0];
-    const idxInfl=headers.findIndex(h=>/influenc/i.test(h));
-    const idxImp =headers.findIndex(h=>/impress/i.test(h));
-    const idxView=headers.findIndex(h=>/view/i.test(h));
-
-    // Agrega por influenciador somando todas as planilhas
+    // Agrega por influenciador + conteúdo somando todas as planilhas
     const merged={};
     campSheets.forEach(s=>{
       const rows=_orgData[s.id];
       const h=rows[0];
-      const iI=h.findIndex(x=>/influenc/i.test(x));
-      const iImp=h.findIndex(x=>/impress/i.test(x));
-      const iView=h.findIndex(x=>/view/i.test(x));
+      const iI   = h.findIndex(x=>/influenc/i.test(x));
+      const iC   = h.findIndex(x=>/conte[uú]/i.test(x));
+      const iImp = h.findIndex(x=>/impress/i.test(x));
+      const iView= h.findIndex(x=>/view/i.test(x));
       rows.slice(1).filter(r=>r.some(c=>c)).forEach(r=>{
         const name=(r[iI>=0?iI:0]||'').trim();
         if(!name||/total/i.test(name)) return;
-        if(!merged[name]) merged[name]={influenciador:name,imp:0,view:0,campanha:[]};
-        merged[name].imp  += parseOrgNum(r[iImp>=0?iImp:2]||'');
-        merged[name].view += parseOrgNum(r[iView>=0?iView:3]||'');
-        if(!merged[name].campanha.includes(s.label)) merged[name].campanha.push(s.label);
+        const cont=(r[iC>=0?iC:1]||'').trim();
+        const key=name+'||'+cont;
+        if(!merged[key]) merged[key]={influenciador:name,conteudo:cont,imp:0,view:0};
+        merged[key].imp  += parseOrgNum(r[iImp>=0?iImp:2]||'');
+        merged[key].view += parseOrgNum(r[iView>=0?iView:3]||'');
       });
     });
 
@@ -899,28 +885,32 @@ function showOrgSheet(id){
     if($('org-tbl-title'))$('org-tbl-title').textContent='🔀 Todas as Campanhas — Unificado';
     if($('org-tbl-total'))$('org-tbl-total').textContent=`${rows.length} influenciadores`;
 
-    $('org-head').innerHTML=`<tr><th>Influenciador</th><th>Impressões</th><th>Views</th><th>Campanhas</th></tr>`;
+    $('org-head').innerHTML=`<tr><th>Influenciador</th><th>Conteúdo</th><th>Impressões</th><th>Views</th></tr>`;
     $('org-body').innerHTML=[
-      // Linha de total no topo
-      `<tr style="background:var(--bg2);font-weight:700;border-bottom:2px solid var(--border);"><td>TOTAL</td><td>${fmtOrgNum(String(totalImp))}</td><td>${fmtOrgNum(String(totalView))}</td><td style="color:var(--muted);font-size:11px;">${campSheets.length} campanhas</td></tr>`,
+      `<tr style="background:var(--bg2);font-weight:700;border-bottom:2px solid var(--border);">
+        <td>TOTAL</td><td>—</td>
+        <td>${fmtOrgNum(String(totalImp))}</td>
+        <td>${fmtOrgNum(String(totalView))}</td>
+      </tr>`,
       ...rows.map(r=>{
+        const isPend=r.imp===0;
         const pct=(r.imp/maxImp*100).toFixed(1);
         return`<tr>
           <td style="font-weight:600;">${r.influenciador}</td>
-          <td><div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${pct}%;background:#F5C842;"></div></div><span class="bar-v">${fmtOrgNum(String(r.imp))}</span></div></td>
+          <td style="color:var(--muted);font-size:12px;">${r.conteudo||'—'}</td>
+          <td>${isPend?`<span style="font-size:11px;color:#F5C842;background:rgba(245,200,66,.1);padding:2px 7px;border-radius:20px;">⏳ Pendente</span>`:`<div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${pct}%;background:#F5C842;"></div></div><span class="bar-v">${fmtOrgNum(String(r.imp))}</span></div>`}</td>
           <td>${fmtOrgNum(String(r.view))}</td>
-          <td style="font-size:11px;color:var(--muted);">${r.campanha.join(', ')}</td>
         </tr>`;
       })
     ].join('');
     return;
   }
 
-  // Vista individual por aba
+  // Vista individual — mostra apenas colunas A até D (0-3)
   const s=ORG_SHEETS.find(x=>x.id===id);
   const rows=_orgData[id];
   if(!rows){$('org-head').innerHTML='';$('org-body').innerHTML='';return;}
-  const headers=rows[0];
+  const headers=rows[0].slice(0,4);
   const data=rows.slice(1).filter(r=>r.some(c=>c));
   if($('org-tbl-title'))$('org-tbl-title').textContent=`${s.icon} ${s.label}`;
   if($('org-tbl-total'))$('org-tbl-total').textContent=`${data.length} linhas`;
@@ -928,17 +918,18 @@ function showOrgSheet(id){
   const maxImp=Math.max(...data.map(r=>parseOrgNum(r[idxImp]||'')),1);
   $('org-head').innerHTML=`<tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr>`;
   $('org-body').innerHTML=data.map(r=>{
-    const isTotal=/total/i.test(r[0]||'');
+    const row4=r.slice(0,4); // garante apenas 4 colunas
+    const isTotal=/total/i.test(row4[0]||'');
     const style=isTotal?'background:var(--bg2);font-weight:700;border-top:2px solid var(--border);':'';
     const cells=headers.map((_,i)=>{
-      const v=r[i]||'—';
+      const v=row4[i]||'—';
       const isPend=v.toLowerCase()==='pendente'||v==='-';
       if(i===idxImp&&!isTotal&&!isPend){
         const pct=(parseOrgNum(v)/maxImp*100).toFixed(1);
         return`<td><div class="bar-w"><div class="bar-bg"><div class="bar-f" style="width:${pct}%;background:${s.color};"></div></div><span class="bar-v">${fmtOrgNum(v)}</span></div></td>`;
       }
       if(isPend&&!isTotal) return`<td><span style="font-size:11px;color:#F5C842;background:rgba(245,200,66,.1);padding:2px 7px;border-radius:20px;">⏳ Pendente</span></td>`;
-      return`<td>${fmtOrgNum(v)}</td>`;
+      return`<td>${isTotal&&i===0?`<strong>${v}</strong>`:fmtOrgNum(v)}</td>`;
     }).join('');
     return`<tr style="${style}">${cells}</tr>`;
   }).join('');
