@@ -977,7 +977,7 @@ function startApp(){
   $('login-screen').style.display='none';$('app').style.display='block';
   if(USER.role==='admin'){
     $('admin-panel').style.display='block';$('dash-section').style.display='none';$('topbar-dates').style.display='none';
-    loadCampConfigToForm();loadAdminUsers();
+    loadCampConfigToForm();loadAdminUsers();loadAccessLog();
   }else{
     $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
     $('ds').value=mStart();$('de').value=today();
@@ -1375,5 +1375,6 @@ async function adminDel(username){
   if(res?.ok){toast('Removido.');loadAdminUsers();}else toast(res?.error||'Erro.','red');
 }
 </script>
+</div><!-- fim app -->
 </body>
 </html>
