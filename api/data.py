@@ -102,7 +102,45 @@ def get_by_campaign(camp_filter, start, end):
     """
     return bq_rows(q)
 
-class handler(BaseHTTPRequestHandler):
+def get_by_influencer(camp_filter, start, end):
+    q = f"""
+    SELECT
+        COALESCE(INFLUENCIADOR, 'Sem Influenciador')           AS influenciador,
+        platform,
+        CAMPAIGN_NAME,
+        SUM(COALESCE(IMPRESSIONS,   0))                        AS impressions,
+        SUM(COALESCE(CLICKS_LINK,   0))                        AS clicks_link,
+        SUM(COALESCE(CLICKS,        0))                        AS clicks,
+        SUM(COALESCE(THRUPLAY,      0))                        AS thruplay,
+        SUM(COALESCE(VIEWS25,       0))                        AS views25,
+        SUM(COALESCE(VIEWS50,       0))                        AS views50,
+        SUM(COALESCE(VIEWS75,       0))                        AS views75,
+        SUM(COALESCE(VIEWS100,      0))                        AS views100,
+        SUM(COALESCE(total_comments,       0))                 AS comments,
+        SUM(COALESCE(total_reacoes,        0))                 AS reactions,
+        SUM(COALESCE(total_salvamentos,    0))                 AS saves,
+        SUM(COALESCE(total_compartilhamento, 0))               AS shares,
+        SAFE_DIVIDE(
+            SUM(COALESCE(CLICKS_LINK, 0)),
+            NULLIF(SUM(COALESCE(IMPRESSIONS, 0)), 0)
+        ) * 100  AS ctr_link,
+        SAFE_DIVIDE(
+            SUM(COALESCE(CLICKS, 0)),
+            NULLIF(SUM(COALESCE(IMPRESSIONS, 0)), 0)
+        ) * 100  AS ctr_click,
+        SAFE_DIVIDE(
+            SUM(COALESCE(THRUPLAY, 0)),
+            NULLIF(SUM(COALESCE(IMPRESSIONS, 0)), 0)
+        ) * 100  AS vtr
+    FROM {BQ_TABLE_SAFE}
+    WHERE date BETWEEN '{start}' AND '{end}'
+      AND {camp_filter}
+    GROUP BY influenciador, platform, CAMPAIGN_NAME
+    ORDER BY impressions DESC
+    """
+    return bq_rows(q)
+
+
 
     def do_OPTIONS(self):
         self.send_response(200)
@@ -136,6 +174,8 @@ class handler(BaseHTTPRequestHandler):
                 result = {"rows": get_timeseries(camp_filter, start, end)}
             elif type_ == "by_campaign":
                 result = {"rows": get_by_campaign(camp_filter, start, end)}
+            elif type_ == "by_influencer":
+                result = {"rows": get_by_influencer(camp_filter, start, end)}
             else:
                 return self._send(error_response("Tipo inválido."))
 
