@@ -968,13 +968,13 @@ function startApp(){
   }else{
     $('admin-panel').style.display='none';$('dash-section').style.display='block';$('topbar-dates').style.display='flex';
     $('ds').value=mStart();$('de').value=today();
-    loadConfig().then(()=>{ renderCampHeader(); loadData(); });
+    loadConfig().then(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); }).catch(()=>{ if(!TOKEN)return; renderCampHeader(); loadData(); });
   }
 }
 
 async function apiFetch(path,opts={}){
   const res=await fetch(API+path,{...opts,headers:{'Authorization':'Bearer '+TOKEN,'Content-Type':'application/json',...(opts.headers||{})}});
-  if(res.status===401){doLogout();return null;}
+  if(res.status===401){doLogout();throw new Error('401');}
   return res.json();
 }
 
