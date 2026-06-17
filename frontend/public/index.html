@@ -16,7 +16,7 @@
   --radius:12px;--shadow:0 2px 16px rgba(0,0,0,.4);--shadow-lg:0 8px 32px rgba(0,0,0,.55);
 }
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden;}
 
 /* LOGIN */
 #login-screen{min-height:100vh;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 60% 20%,rgba(245,200,66,.08) 0%,transparent 55%),linear-gradient(160deg,#0A1A12 0%,#0D1F1A 100%);position:relative;overflow:hidden;}
@@ -170,7 +170,95 @@ tbody td{padding:11px 15px;font-size:13px;}
 .toast.green{background:var(--green);border-color:var(--green);color:#fff;}
 .toast.red{background:var(--danger);border-color:var(--danger);color:#fff;}
 
-@media(max-width:960px){.kpi-grid{grid-template-columns:repeat(3,1fr);}.camp-compare,.camp-header,.camp-config-grid{grid-template-columns:1fr;}.charts-grid{grid-template-columns:1fr;}.adm-form{grid-template-columns:1fr 1fr;}.topbar{padding:0 14px;}.main{padding:14px;}}
+@media(max-width:960px){
+  .kpi-grid{grid-template-columns:repeat(3,1fr);}
+  .camp-compare,.camp-header,.camp-config-grid{grid-template-columns:1fr;}
+  .charts-grid{grid-template-columns:1fr;}
+  .adm-form{grid-template-columns:1fr 1fr;}
+  .topbar{padding:0 14px;}
+  .main{padding:14px;}
+}
+
+/* ── MOBILE ─────────────────────────────────────── */
+@media(max-width:600px){
+  /* Prevent horizontal scroll */
+  html,body{overflow-x:hidden;width:100%;}
+  .main{padding:10px 10px;overflow-x:hidden;}
+
+  /* Topbar — stack dates below logo on mobile */
+  .topbar{height:auto;flex-wrap:wrap;padding:8px 12px;gap:6px;}
+  .t-left{flex:1;}
+  .logo{font-size:18px;}
+  .copa-pill{font-size:10px;padding:3px 8px;}
+  .t-right{width:100%;justify-content:space-between;}
+  #topbar-dates{flex-wrap:wrap;gap:4px;width:100%;}
+  .date-row{flex:1;min-width:0;font-size:12px;padding:5px 8px;}
+  .date-row input{font-size:12px;width:90px;}
+  .btn-gold{font-size:12px;padding:7px 12px;}
+  .btn-outline{font-size:12px;padding:7px 10px;}
+
+  /* Tabs — scrollable horizontal strip */
+  .tabs{width:100%;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;border-radius:10px;}
+  .tabs::-webkit-scrollbar{display:none;}
+  .tab{white-space:nowrap;padding:8px 14px;font-size:12px;}
+
+  /* Camp header — 1 col */
+  .camp-header{grid-template-columns:1fr !important;}
+  .camp-slot{padding:12px 14px;}
+
+  /* KPI grid — 2 col */
+  .kpi-grid{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+  .kpi-card{padding:12px 10px;}
+  .kpi-val{font-size:20px;}
+  .kpi-lbl{font-size:9px;}
+
+  /* Org cards — 2 col */
+  #org-cards{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+
+  /* Infl kpi strip — 2 col */
+  #infl-kpi-strip{grid-template-columns:repeat(2,1fr) !important;gap:8px;}
+
+  /* Camp compare — 1 col */
+  .camp-compare{grid-template-columns:1fr !important;}
+
+  /* Charts — 1 col */
+  .charts-grid{grid-template-columns:1fr;}
+
+  /* Tables — horizontal scroll */
+  .tbl-card [style*="overflow-x"],
+  div[style*="overflow-x"]{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  table{min-width:500px;}
+  #infl-table{min-width:900px;}
+  tbody td{padding:8px 10px;font-size:12px;}
+  thead th{padding:7px 10px;font-size:9px;}
+
+  /* Org sub-tabs */
+  #org-subtabs{overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none;flex-wrap:nowrap;width:100%;}
+  #org-subtabs::-webkit-scrollbar{display:none;}
+  #org-subtabs .tab{white-space:nowrap;font-size:11px;padding:6px 10px;}
+
+  /* Admin form */
+  .adm-form{grid-template-columns:1fr !important;}
+  .camp-config-grid{grid-template-columns:1fr !important;}
+
+  /* Section labels */
+  .sec-lbl{font-size:10px;}
+
+  /* Login card */
+  .login-card{width:94vw;padding:32px 20px;}
+  .brand{font-size:30px;}
+
+  /* Podium — smaller on mobile */
+  #infl-podium > div, #org-podium > div{gap:6px !important;padding:0 4px !important;}
+
+  /* Filters wrap */
+  #tab-influenciadores > div:first-child{flex-direction:column;align-items:flex-start !important;}
+  #tab-influenciadores input,
+  #tab-influenciadores select{width:100% !important;}
+
+  /* Topbar dates full width */
+  #topbar-dates{display:flex !important;flex-direction:row;flex-wrap:wrap;align-items:center;gap:6px;}
+}
 </style>
 </head>
 <body>
@@ -202,11 +290,11 @@ tbody td{padding:11px 15px;font-size:13px;}
       <div class="copa-pill">🏆 Copa 2026</div>
     </div>
     <div class="t-right">
-      <div id="topbar-dates" style="display:none;align-items:center;gap:8px;">
+      <div id="topbar-dates" style="display:none;align-items:center;gap:6px;">
         <div class="date-row">📅 <input type="date" id="ds"><span class="date-sep">→</span><input type="date" id="de"></div>
         <button class="btn-gold" id="upd-btn" onclick="loadData()">Atualizar</button>
       </div>
-      <button class="btn-outline" onclick="doLogout()">← Sair</button>
+      <button class="btn-outline" onclick="doLogout()" style="white-space:nowrap;">← Sair</button>
     </div>
   </div>
   <div class="main">
